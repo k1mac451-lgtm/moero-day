@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>燃えろ!デーゲーム</title>
-    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -32,7 +31,7 @@
         .title-btn.red-btn { background: linear-gradient(135deg, #a00 0%, #600 100%); border: 2px solid #fff; text-shadow: 1px 1px 0 #000; }
         .title-btn.black-gold-btn { background: #111; color: #FFD700; border: 2px solid #FFD700; text-shadow: 1px 1px 0 #000; box-shadow: 0 0 12px rgba(255, 215, 0, 0.3); }
         .title-btn:active { transform: scale(0.95); }
-        
+
         /* スタジアム切替演出 */
         #stadium-transit-screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
@@ -49,7 +48,7 @@
         @keyframes twinkleStar { from { opacity: 0.2; transform: scale(0.8); } to { opacity: 1; transform: scale(1.2); box-shadow: 0 0 6px #00E5FF; } }
         .transit-text-eng { font-size: 1.5rem; font-weight: 900; color: #FFFF00; text-shadow: 3px 3px 0 #d32f2f; margin-bottom: 8px; z-index: 10; letter-spacing: 1px; }
         .transit-text-main { font-size: 1.1rem; font-weight: bold; color: #fff; text-shadow: 2px 2px 0 #000; z-index: 10; }
-        
+
         /* ロビー画面 */
         #lobby-screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
@@ -65,7 +64,7 @@
         .lobby-btn.guest { background: #FF9900; color: #000; }
         .lobby-btn.single { background: #444; color: #fff; }
         .lobby-btn.trouble { background: #d32f2f; color: #fff; font-size: 11px; padding: 6px; }
-        
+
         .net-signal-box {
             background: #050b14; border: 1.5px solid #00E5FF; border-radius: 4px; padding: 6px; margin-top: 8px; font-size: 10px; text-align: left; color: #00E5FF; font-family: monospace; display: none;
         }
@@ -85,7 +84,7 @@
         #game-container.mode-night .l2 { background: radial-gradient(circle at center, #1b4332 0%, #081c15 100%); }
         #game-container.mode-night .l4 { background: #081c15; }
         #game-container.mode-night .l4-left, #game-container.mode-night .l4-right { background: #1b4332; border-color: #2d6a4f; }
-        
+
         .l1 { height: 52px; color: #000; display: flex; font-weight: 900; border-bottom: 2px solid #000; flex-shrink: 0; position: relative; }
         .team-box { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 14px; font-weight: 900; position: relative; padding-top: 1px; }
         .team-box.blacks { color: #fff; background: #111; }
@@ -100,24 +99,24 @@
         .out-container { display: flex; margin-top: 1px; }
         .out-ball { width: 8px; height: 8px; border-radius: 50%; background: #777; border: 1.5px solid #222; margin: 0 2px; }
         .out-ball.active { background: #f00; box-shadow: 0 0 6px #f00; }
-        
+
         .l2 { height: 205px; position: relative; display: flex; justify-content: center; align-items: center; border-bottom: 2px solid #000; flex-shrink: 0; overflow: hidden; }
         .base { position: absolute; width: 12px; height: 12px; background: #fff; transform: rotate(45deg); z-index: 2; border: 1px solid #333; }
         .base.active { background: #00bfff; box-shadow: 0 0 8px #00bfff, 0 0 12px #00bfff; }
         .b-second { top: 22px; left: calc(50% - 6px); }
         .b-third { left: 58px; top: calc(50% - 6px); }
         .b-first { right: 58px; top: calc(50% - 6px); }
-        
+
         .game-card { width: 32px; height: 42px; border-radius: 3px; display: flex; justify-content: center; align-items: center; font-weight: 900; font-size: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.6); cursor: pointer; user-select: none; }
         .card-black { border: 1.5px solid #fff; background: #111; color: #FFD700; }
         .card-red { border: 1.5px solid #fff; background: #c00; color: #fff; }
         .card-hidden { border: 1.5px solid #fff; background: linear-gradient(135deg, #111 50%, #c00 50%); color: transparent; font-size: 0px; cursor: default; }
         .card-empty-slot { width: 100%; height: 100%; border: 1.5px dashed #285429; background: #1e3f20; border-radius: 3px; cursor: default; }
-        
+
         .vs { width: 38px; height: 38px; background: #ffd700; color: #000; font-size: 13px; font-weight: 900; border: 2px solid #000; border-radius: 6px; display: flex; justify-content: center; align-items: center; cursor: pointer; box-shadow: 0 3px 6px rgba(0,0,0,0.6); z-index: 10; user-select: none; position: absolute; top: calc(50% - 13px); left: calc(50% - 19px); }
         .vs:active { transform: scale(0.95); }
         #countdown-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); color: #FFD700; font-size: 3rem; font-weight: 900; display: none; justify-content: center; align-items: center; z-index: 100; text-shadow: 0 0 10px #FF0000, 0 0 20px #FFD700; letter-spacing: 2px; }
-        
+
         /* 演出用デカテキストオーバーレイ */
         #action-effect-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
@@ -149,37 +148,35 @@
             65% { left: calc(50% - 110px); opacity: 1; transform: scale(1.0) rotate(0deg); }
             100% { left: 400px; opacity: 0; transform: scale(1.2) rotate(10deg); }
         }
-
         .pos-top-flag { position: absolute; top: calc(50% - 58px); left: calc(50% - 16px); }
         .pos-bottom-flag { position: absolute; top: calc(50% + 28px); left: calc(50% - 16px); }
         .pos-left-battle { position: absolute; left: calc(50% - 54px); top: calc(50% - 15px); }
         .pos-right-battle { position: absolute; left: calc(50% + 22px); top: calc(50% - 15px); }
-        
+
         .board { position: absolute; top: 5px; width: 124px; height: 60px; border: 2px solid #ff0; border-radius: 5px; padding: 2px; font-size: 11px; color: #fff; font-weight: 900; line-height: 1.3; z-index: 5; box-shadow: 0 2px 5px rgba(0,0,0,0.5); display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; transition: left 0.15s, right 0.15s; }
         .board.pos-visitor { left: 4px; right: auto; }
         .board.pos-home { right: 4px; left: auto; }
         .board.bg-red { background: #c00; border-color: #FFFF00; color: #fff; }
         .board.bg-black { background: #0a0a0a; border-color: #FFD700; color: #FFD700; box-shadow: 0 0 12px rgba(255, 215, 0, 0.5); }
-        
+
         .sub-guide-board { position: absolute; bottom: 5px; width: 116px; height: 50px; border: 2px solid #00E5FF; border-radius: 5px; padding: 2px; font-size: 10.5px; font-weight: 900; line-height: 1.25; z-index: 5; box-shadow: 0 2px 5px rgba(0,0,0,0.5); display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; transition: left 0.15s, right 0.15s; }
         .sub-guide-board.diag-bottom-left { left: 4px; right: auto; }
         .sub-guide-board.diag-bottom-right { right: 4px; left: auto; }
         .sub-guide-board.bg-red { background: #a00; border-color: #FFFF00; color: #fff; }
         .sub-guide-board.bg-black { background: #111; border-color: #FFD700; color: #FFD700; }
-
         .timer-board { position: absolute; top: 5px; width: 124px; height: 60px; border: 2px solid #00E5FF; border-radius: 5px; background: #050b14; color: #00E5FF; font-weight: 900; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 6; box-shadow: 0 0 12px rgba(0,229,255,0.5); text-align: center; line-height: 1.3; }
         .timer-board.pos-visitor { left: 4px; right: auto; }
         .timer-board.pos-home { right: 4px; left: auto; }
-        
+
         .l3 { height: 42px; background: #000; color: #ff0; font-size: 11.5px; font-weight: 900; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 2px 6px; border-bottom: 2px solid #333; flex-shrink: 0; line-height: 1.35; letter-spacing: 0.3px; }
         .l4 { height: 175px; background: #2e6930; display: flex; padding: 3px; gap: 3px; flex-shrink: 0; }
         .l4-left, .l4-right { width: 50%; background: #1e3f20; border: 2px solid #112d12; border-radius: 5px; display: flex; flex-direction: column; padding: 3px; height: 100%; }
         .l4-right { justify-content: space-between; gap: 2px; }
-        
+
         .effect-guide { height: 24px; background: #ffd700; color: #000; font-size: 10px; font-weight: 900; display: flex; justify-content: center; align-items: center; border-radius: 3px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 2px; letter-spacing: -0.2px; }
         .hand-cards-grid { display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(2, 1fr); gap: 2px; flex-grow: 1; height: 100%; }
         .hand-cards-grid .game-card { width: 100%; height: 100%; font-size: 17px; font-weight: 900; }
-        
+
         .team-logo-changer {
             height: 25px; border: 1.5px solid #fff; font-weight: 900; font-size: 10px; border-radius: 3px; cursor: pointer; display: flex; justify-content: center; align-items: center; flex-shrink: 0; user-select: none;
             background: linear-gradient(135deg, #111 50%, #c00 50%); color: #fff; text-shadow: 1px 1px 1px #000; box-shadow: 0 2px 5px rgba(0,0,0,0.5);
@@ -187,11 +184,11 @@
         .team-logo-changer.locked {
             opacity: 0.75; cursor: default; background: #222; border-color: #FFD700; color: #FFD700;
         }
-        
+
         .foul-grid-16 { display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(4, 1fr); gap: 2px; width: 100%; height: 100%; }
         .foul-title-banner { grid-column: span 2; grid-row: span 1; background: #112d12; border: 1.5px solid #ffd700; border-radius: 3px; display: flex; justify-content: center; align-items: center; font-size: 10px; font-weight: 900; color: #ffd700; }
         .foul-slot { border: 1.5px dashed #336633; background: #112d12; border-radius: 3px; display: flex; justify-content: center; align-items: center; font-size: 9px; color: #666; font-weight: 900; width: 100%; height: 100%; }
-        
+
         #result-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 20, 0, 0.95); color: #fff; display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 700; text-align: center; padding: 15px; }
         .news-box { width: 100%; max-width: 310px; border: 3px solid #ff0; border-radius: 6px; background: #111; padding: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.8); }
         .news-title { font-size: 14px; font-weight: 900; color: #ff0; margin-bottom: 8px; border-bottom: 2px solid #ff0; padding-bottom: 4px; }
@@ -204,7 +201,7 @@
         .news-btn.rematch { background: #00E5FF; color: #000; }
         .news-btn.exit { background: #ffd700; color: #000; }
         .news-btn:active { transform: scale(0.98); }
-        
+
         #rematch-modal { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 800; padding: 20px; }
         .modal-box { background: #111; border: 2px solid #00E5FF; padding: 18px; border-radius: 8px; text-align: center; max-width: 280px; }
         .modal-msg { font-size: 14px; font-weight: bold; color: #fff; margin-bottom: 15px; }
@@ -226,7 +223,7 @@
             <button class="title-btn black-gold-btn" onclick="appManager.onTitleStartTapped('PVP')">通信対戦<br><span style="font-size:10px; font-weight:normal;">(Black Dome)</span></button>
         </div>
     </div>
-    
+
     <!-- スタジアム切替演出 -->
     <div id="stadium-transit-screen">
         <div class="transit-cloud transit-cloud-1" id="transit-cloud-1"></div>
@@ -250,13 +247,13 @@
             <button class="lobby-btn guest" onclick="appManager.joinRoom()">ゲストとしてID参加</button>
             <button class="lobby-btn single" onclick="appManager.startPvpSingleMode()">通信シングル (疑似対人戦)</button>
             <button class="lobby-btn trouble" onclick="appManager.runTroubleshootDiagnostic()">通信診断・リセット</button>
-            
+
             <div class="net-signal-box" id="net-signal-box">
                 <div class="signal-row"><span>Status:</span><span id="sig-status" style="color:#FFFF00;">Standby</span></div>
                 <div class="signal-row"><span>Handshake:</span><span id="sig-handshake"><span class="signal-dot"></span>Waiting...</span></div>
                 <div class="signal-row"><span>Ping/Sync:</span><span id="sig-ping">--- ms</span></div>
             </div>
-            
+
             <div style="font-size:9.5px; color:#FFD700; margin-top:5px; line-height:1.2;" id="lobby-status-msg">操作チームを選び「ルーム作成」または「シングル」を押してください</div>
         </div>
     </div>
@@ -308,26 +305,25 @@
         <div class="l2">
             <div id="countdown-overlay">3</div>
             <div id="action-effect-overlay"></div>
-
             <!-- メイン掲示板 -->
             <div class="board pos-home bg-red" id="case-box" onclick="gameLoop.onBoardOrFlagTapped()">HOMEルート<br>後攻 REDS(守備)</div>
-            
+
             <!-- サブボード -->
             <div class="sub-guide-board diag-bottom-left bg-red" id="sub-guide-box" onclick="gameLoop.onBoardOrFlagTapped()">チームを選び<br>VSタップして開始</div>
-            
+
             <!-- タイマーボード（通信モード専用） -->
             <div class="timer-board pos-visitor" id="timer-board-el" style="display:none;">
                 <span style="font-size:9px;" id="timer-lbl">TIMING</span>
                 <span style="font-size:16px;" id="timer-val">30s</span>
             </div>
-            
+
             <div class="base b-second" id="base-2"></div>
             <div class="base b-third" id="base-3"></div>
             <div class="base b-first" id="base-1"></div>
-            
+
             <div class="game-card card-hidden pos-top-flag" id="pos-top-flag" onclick="gameLoop.onBoardOrFlagTapped()"></div>
             <div class="game-card card-hidden pos-bottom-flag" id="pos-bottom-flag" onclick="gameLoop.onBoardOrFlagTapped()"></div>
-            
+
             <div class="game-card card-hidden pos-left-battle" id="pos-left-battle" onclick="gameLoop.returnCardFromBattle('left')"></div>
             <div class="vs" onclick="gameLoop.onVsPanelTapped()">VS</div>
             <div class="game-card card-hidden pos-right-battle" id="pos-right-battle" onclick="gameLoop.returnCardFromBattle('right')"></div>
@@ -340,14 +336,8 @@
             <div class="l4-right" id="hand-grid"></div>
         </div>
     </div>
-    <script>
-    const CUSTOM_PEER_CONFIG = {
-        host: '451k1-peer-server.onrender.com',
-        port: 443,
-        path: '/',
-        secure: true
-    };
 
+    <script>
     class SoundManager {
         constructor() { this.ctx = null; }
         init() {
@@ -379,7 +369,7 @@
             this.init();
             if (!this.ctx) return;
             try {
-                let bufferSize = this.ctx.sampleRate * duration;
+                let bufferSize = Math.max(1, Math.floor(this.ctx.sampleRate * duration));
                 let buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
                 let data = buffer.getChannelData(0);
                 for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
@@ -496,168 +486,91 @@
 
     class NetworkManager {
         constructor() {
-            this.peer = null;
-            this.conn = null;
             this.channel = null;
             this.roomId = null;
             this.role = null;
             this.myTeam = null;
             this.onDataCallback = null;
-            this.onOpenCallback = null;
-            this.onPeerConnectCallback = null;
-            this.onErrorCallback = null;
             this.pingTimer = null;
             this.lastPingTime = 0;
             this.lastProcessedMsgId = null;
             this.isConnected = false;
         }
-        setupPeer({ customId = null, targetHostId = null, role, myTeam, onData, onOpen, onPeerConnect, onError }) {
-            this.close(false);
+        init(roomId, role, myTeam, callback) {
+            this.roomId = roomId;
             this.role = role;
             this.myTeam = myTeam;
-            this.onDataCallback = onData;
-            this.onOpenCallback = onOpen;
-            this.onPeerConnectCallback = onPeerConnect;
-            this.onErrorCallback = onError;
+            this.onDataCallback = callback;
             this.isConnected = false;
+            this.lastProcessedMsgId = null;
 
-            if (typeof Peer === 'undefined') {
-                if (typeof this.onErrorCallback === 'function') {
-                    this.onErrorCallback(new Error('PeerJSライブラリが読み込まれていません'));
-                }
-                return;
-            }
-
-            this.peer = customId ? new Peer(customId, CUSTOM_PEER_CONFIG) : new Peer(CUSTOM_PEER_CONFIG);
-
-            this.peer.on('open', (id) => {
-                this.roomId = customId || targetHostId || id;
-                this.setupLocalFallback(this.roomId);
-                if (typeof this.onOpenCallback === 'function') {
-                    this.onOpenCallback(id);
-                }
-                if (targetHostId) {
-                    const connection = this.peer.connect(targetHostId, { reliable: true });
-                    this.bindConnection(connection);
-                }
-            });
-
-            this.peer.on('connection', (connection) => {
-                this.bindConnection(connection);
-                if (typeof this.onPeerConnectCallback === 'function') {
-                    this.onPeerConnectCallback(connection);
-                }
-            });
-
-            this.peer.on('error', (err) => {
-                if (typeof this.onErrorCallback === 'function') {
-                    this.onErrorCallback(err);
-                }
-            });
-
-            this.peer.on('disconnected', () => {
-                this.isConnected = false;
-                appManager.updateNetworkSignalUI(false, 0);
-            });
-        }
-        setupLocalFallback(roomId) {
-            if (!roomId) return;
             if (window.BroadcastChannel) {
                 if (this.channel) this.channel.close();
                 this.channel = new BroadcastChannel('black_dome_room_' + roomId);
                 this.channel.onmessage = (event) => {
-                    this.handleIncomingPayload(event.data);
+                    if (!event.data || event.data.senderRole === this.role) return;
+                    if (event.data.msgId && event.data.msgId === this.lastProcessedMsgId) return;
+                    this.lastProcessedMsgId = event.data.msgId || null;
+                    this.isConnected = true;
+
+                    if (event.data.type === 'PING') {
+                        this.send({ type: 'PONG', timestamp: event.data.timestamp });
+                        return;
+                    }
+                    if (event.data.type === 'PONG') {
+                        let latency = Math.max(1, Date.now() - event.data.timestamp);
+                        appManager.updateNetworkSignalUI(true, latency);
+                        return;
+                    }
+                    if (typeof this.onDataCallback === 'function') {
+                        this.onDataCallback(event.data);
+                    }
                 };
             }
+
             if (this.pingTimer) clearInterval(this.pingTimer);
             this.pingTimer = setInterval(() => {
-                if (this.roomId) {
-                    this.lastPingTime = Date.now();
-                    this.send({ type: 'PING', timestamp: this.lastPingTime }, true);
-                    try {
-                        let saved = localStorage.getItem('bd_net_' + this.roomId);
-                        if (saved) {
-                            let parsed = JSON.parse(saved);
-                            if (parsed.senderRole !== this.role && parsed.timestamp && (Date.now() - parsed.timestamp < 4000)) {
-                                this.handleIncomingPayload(parsed);
+                if (!this.roomId) return;
+                this.lastPingTime = Date.now();
+                this.send({ type: 'PING', timestamp: this.lastPingTime });
+                try {
+                    let saved = localStorage.getItem('bd_net_' + this.roomId);
+                    if (saved) {
+                        let parsed = JSON.parse(saved);
+                        if (parsed.senderRole !== this.role && parsed.timestamp && (Date.now() - parsed.timestamp < 3000)) {
+                            this.isConnected = true;
+                            if (parsed.type === 'PONG' && parsed.timestamp) {
+                                appManager.updateNetworkSignalUI(true, Math.max(1, Date.now() - parsed.timestamp));
+                            }
+                            if (typeof this.onDataCallback === 'function' && parsed.type !== 'PING' && parsed.type !== 'PONG') {
+                                if (parsed.msgId && parsed.msgId !== this.lastProcessedMsgId) {
+                                    this.lastProcessedMsgId = parsed.msgId;
+                                    this.onDataCallback(parsed);
+                                }
                             }
                         }
-                    } catch(e){}
-                }
+                    }
+                } catch(e) {}
             }, 1500);
         }
-        bindConnection(connection) {
-            this.conn = connection;
-            this.conn.on('open', () => {
-                this.isConnected = true;
-                this.lastPingTime = Date.now();
-                this.conn.send({ type: 'PING', timestamp: this.lastPingTime, senderRole: this.role, msgId: 'ping-' + Math.random() });
-                appManager.updateNetworkSignalUI(true, 12);
-            });
-            this.conn.on('data', (data) => {
-                this.handleIncomingPayload(data);
-            });
-            this.conn.on('close', () => {
-                this.isConnected = false;
-                appManager.updateNetworkSignalUI(false, 0);
-                if (typeof this.onDataCallback === 'function') {
-                    this.onDataCallback({ type: 'PEER_DISCONNECTED', senderRole: this.role });
-                }
-            });
-            this.conn.on('error', (err) => {
-                if (typeof this.onErrorCallback === 'function') {
-                    this.onErrorCallback(err);
-                }
-            });
-        }
-        handleIncomingPayload(data) {
-            if (!data || data.senderRole === this.role) return;
-            if (data.msgId && data.msgId === this.lastProcessedMsgId) return;
-            if (data.msgId) this.lastProcessedMsgId = data.msgId;
-
-            this.isConnected = true;
-            if (data.type === 'PING') {
-                this.send({ type: 'PONG', timestamp: data.timestamp }, true);
-                appManager.updateNetworkSignalUI(true, 15);
-                return;
-            }
-            if (data.type === 'PONG') {
-                let latency = Math.max(1, Date.now() - data.timestamp);
-                appManager.updateNetworkSignalUI(true, latency);
-                return;
-            }
-            if (typeof this.onDataCallback === 'function') {
-                this.onDataCallback(data);
-            }
-        }
-        send(data, localOnly = false) {
+        send(data) {
+            if (!this.roomId) return;
             const payload = Object.assign({}, data, {
                 senderRole: this.role,
                 timestamp: Date.now(),
                 msgId: Math.random().toString(36).substring(2, 10)
             });
-            if (!localOnly && this.conn && this.conn.open) {
-                try { this.conn.send(payload); } catch(e) {}
-            }
             if (this.channel) {
                 try { this.channel.postMessage(payload); } catch(e) {}
             }
-            if (this.roomId) {
-                try { localStorage.setItem('bd_net_' + this.roomId, JSON.stringify(payload)); } catch(e){}
-            }
+            try {
+                localStorage.setItem('bd_net_' + this.roomId, JSON.stringify(payload));
+            } catch(e) {}
         }
-        close(clearCallbacks = true) {
+        close() {
             if (this.pingTimer) { clearInterval(this.pingTimer); this.pingTimer = null; }
-            if (this.channel) { try { this.channel.close(); } catch(e){} this.channel = null; }
-            if (this.conn) { try { this.conn.close(); } catch(e){} this.conn = null; }
-            if (this.peer) { try { this.peer.destroy(); } catch(e){} this.peer = null; }
+            if (this.channel) { this.channel.close(); this.channel = null; }
             this.isConnected = false;
-            if (clearCallbacks) {
-                this.onDataCallback = null;
-                this.onOpenCallback = null;
-                this.onPeerConnectCallback = null;
-                this.onErrorCallback = null;
-            }
         }
     }
 
@@ -679,19 +592,19 @@
             this.isFlagOpened = false;
             this.currentCase = { caseNum: "CASE⑨", description: "ホームラン or アウト" };
             this.battleCards = { visitor: null, home: null };
-            
+
             this.playerFlagReady = false;
             this.opponentFlagReady = false;
             this.playerReady = false;
             this.opponentReady = false;
-            
+
             this.foulPairs = [];
             this.pendingFoulPair = null;
-            
+
             this.myTeam = 'REDS';
             this.hostTeamChoice = 'BLACKS';
             this.netRole = 'HOST';
-            
+
             this.handsData = {
                 BLACKS: [
                     { id: 0, rank: 'A', color: 'black', used: false },
@@ -714,18 +627,33 @@
                     { id: 7, rank: 'J', color: 'red', used: false }
                 ]
             };
-            
+
             this.lastBattleSuccess = null;
             this.turnTimer = null;
             this.timeLeft = 30;
             this.justStartedPlayBall = false;
+            this.gameEnded = false;
+            this.scoreTimers = [];
+            this.joinPollTimer = null;
             this.stats = { hits: { visitor: 0, home: 0 }, errors: { visitor: 0, home: 0 }, homeRuns: { visitor: 0, home: 0 } };
+        }
+
+        clearScoreTimers() {
+            this.scoreTimers.forEach(t => clearTimeout(t));
+            this.scoreTimers = [];
+        }
+
+        clearJoinPoll() {
+            if (this.joinPollTimer) {
+                clearInterval(this.joinPollTimer);
+                this.joinPollTimer = null;
+            }
         }
 
         onTitleStartTapped(mode) {
             snd.init();
+            this.clearJoinPoll();
             this.gameMode = mode;
-
             document.getElementById('title-screen').style.display = 'none';
             const gContainer = document.getElementById('game-container');
             const transit = document.getElementById('stadium-transit-screen');
@@ -737,29 +665,29 @@
                 this.myTeam = 'REDS';
                 gContainer.className = "mode-day";
                 transit.className = "";
-                if(cloud1) cloud1.style.display = 'block';
-                if(cloud2) cloud2.style.display = 'block';
-                if(starsContainer) starsContainer.innerHTML = '';
-                
+                if (cloud1) cloud1.style.display = 'block';
+                if (cloud2) cloud2.style.display = 'block';
+                if (starsContainer) starsContainer.innerHTML = '';
+
                 document.getElementById('transit-eng-text').textContent = "Let's go to REDS Stadium！";
                 document.getElementById('transit-text-main').textContent = "青空のデーゲームへ…";
                 snd.playGameStartHitAndCheers();
-                
+
                 transit.style.display = 'flex';
                 setTimeout(() => {
                     transit.style.display = 'none';
                     gContainer.style.display = 'flex';
                     this.startMatchInit();
-                }, 3000);
+                }, 2200);
             } else {
                 gContainer.className = "mode-night";
                 transit.className = "transit-night";
-                if(cloud1) cloud1.style.display = 'none';
-                if(cloud2) cloud2.style.display = 'none';
-                
-                if(starsContainer) {
+                if (cloud1) cloud1.style.display = 'none';
+                if (cloud2) cloud2.style.display = 'none';
+
+                if (starsContainer) {
                     let starsHtml = '';
-                    for(let i=0; i<25; i++) {
+                    for (let i = 0; i < 25; i++) {
                         let top = Math.random() * 85;
                         let left = Math.random() * 95;
                         let size = 2 + Math.random() * 3;
@@ -768,22 +696,23 @@
                     }
                     starsContainer.innerHTML = starsHtml;
                 }
-
                 snd.playWelcomeBlackDomeVoiceSE();
                 document.getElementById('transit-eng-text').textContent = "Welcome to the Black Dome！";
                 document.getElementById('transit-text-main').textContent = "エキシビションナイター";
-                
+
                 transit.style.display = 'flex';
                 setTimeout(() => {
                     transit.style.display = 'none';
                     document.getElementById('lobby-screen').style.display = 'flex';
-                }, 2500);
+                }, 2000);
             }
         }
+
         resetHands() {
             this.handsData.BLACKS.forEach(c => c.used = false);
             this.handsData.REDS.forEach(c => c.used = false);
         }
+
         selectHostTeam(team) {
             snd.seSelect();
             this.hostTeamChoice = team;
@@ -798,6 +727,7 @@
                 btnB.style.background = '#444'; btnB.style.color = '#aaa'; btnB.style.borderColor = '#444';
             }
         }
+
         updateNetworkSignalUI(isConnected, latency) {
             let sigBox = document.getElementById('net-signal-box');
             let sigStatus = document.getElementById('sig-status');
@@ -806,7 +736,7 @@
             if (!sigBox) return;
             sigBox.style.display = 'block';
             if (isConnected) {
-                sigStatus.textContent = "Connected (PeerServer)";
+                sigStatus.textContent = "Connected (Online)";
                 sigStatus.style.color = "#00FF00";
                 sigHandshake.innerHTML = `<span class="signal-dot active"></span>Synced & Ready`;
                 sigPing.textContent = `${latency} ms`;
@@ -817,80 +747,75 @@
                 sigPing.textContent = "--- ms";
             }
         }
+
         runTroubleshootDiagnostic() {
             snd.seSelect();
+            this.clearJoinPoll();
             this.net.close();
-            document.getElementById('room-id-input').value = '';
-            this.updateNetworkSignalUI(false, 0);
-            document.getElementById('lobby-status-msg').textContent = "通信診断完了。接続をリセットしました。再度作成または参加をお試しください。";
+            document.getElementById('room-id-input').value = "";
+            document.getElementById('lobby-status-msg').textContent = "通信診断完了。再度ルーム作成・参加またはシングルをお試しください。";
+            alert("【通信診断ツール】\n1. ルーム接続とポーリングをリセットしました。\n2. 同期キャッシュの競合状態をクリアしました。");
         }
+
         createRoom() {
             snd.seSelect();
-            let roomId = "md-" + Math.floor(1000 + Math.random() * 9000);
+            this.clearJoinPoll();
+            let roomId = "BD-" + Math.floor(1000 + Math.random() * 9000);
             document.getElementById('room-id-input').value = roomId;
-            try { navigator.clipboard.writeText(roomId); } catch(e){}
-            
+            try { navigator.clipboard.writeText(roomId); } catch(e) {}
+
             this.netRole = 'HOST';
             this.pvpSubMode = 'ONLINE';
             this.myTeam = this.hostTeamChoice;
+            this.net.init(roomId, 'HOST', this.myTeam, (data) => this.handleNetworkData(data));
+            document.getElementById('lobby-status-msg').textContent = `📡 ルーム作成完了 [ID: ${roomId}]。ゲスト待機中...`;
             this.updateNetworkSignalUI(false, 0);
-            document.getElementById('lobby-status-msg').textContent = `🌐 Peerサーバー接続中... [ID: ${roomId}]`;
 
-            this.net.setupPeer({
-                customId: roomId,
-                role: 'HOST',
-                myTeam: this.myTeam,
-                onOpen: (id) => {
-                    document.getElementById('room-id-input').value = id;
-                    document.getElementById('lobby-status-msg').textContent = `📡 ルーム開設完了 [ID: ${id}]。ゲスト待機中...`;
-                },
-                onPeerConnect: () => {
-                    this.updateNetworkSignalUI(true, 15);
-                    document.getElementById('lobby-status-msg').textContent = `🔗 ゲスト合流成功！プレイボール！`;
-                    this.net.send({ type: 'START_MATCH', hostTeam: this.hostTeamChoice });
-                    setTimeout(() => this.startPvpGame('ONLINE'), 900);
-                },
-                onData: (data) => this.handleNetworkData(data),
-                onError: (err) => {
-                    document.getElementById('lobby-status-msg').textContent = `❌ 接続エラー: ${err && err.type ? err.type : 'Peer通信失敗'}`;
+            this.joinPollTimer = setInterval(() => {
+                let saved = localStorage.getItem('bd_net_' + roomId);
+                if (saved) {
+                    try {
+                        let parsed = JSON.parse(saved);
+                        if (parsed.senderRole === 'GUEST' && parsed.type === 'JOIN') {
+                            this.clearJoinPoll();
+                            this.updateNetworkSignalUI(true, 15);
+                            document.getElementById('lobby-status-msg').textContent = `🔗 ゲスト合流成功！プレイボール！`;
+                            setTimeout(() => this.startPvpGame('ONLINE'), 800);
+                        }
+                    } catch(e) {}
                 }
-            });
+            }, 800);
         }
+
         joinRoom() {
             snd.seSelect();
-            let rawId = prompt("ホストから教わったID（例: md-1234）を入力してください:");
-            if(!rawId) return;
-            let id = rawId.trim();
-            document.getElementById('room-id-input').value = id;
-            this.netRole = 'GUEST';
-            this.pvpSubMode = 'ONLINE';
-            this.myTeam = (this.hostTeamChoice === 'REDS') ? 'BLACKS' : 'REDS';
-            
-            this.updateNetworkSignalUI(false, 0);
-            document.getElementById('lobby-status-msg').textContent = `🔗 ホスト [ID: ${id}] へ接続中...`;
+            this.clearJoinPoll();
+            let id = prompt("ホストから教わったID（例: BD-1234）を入力してください:");
+            if (id && id.trim()) {
+                id = id.trim();
+                document.getElementById('room-id-input').value = id;
+                this.netRole = 'GUEST';
+                this.pvpSubMode = 'ONLINE';
+                this.myTeam = (this.hostTeamChoice === 'REDS') ? 'BLACKS' : 'REDS';
 
-            this.net.setupPeer({
-                targetHostId: id,
-                role: 'GUEST',
-                myTeam: this.myTeam,
-                onOpen: () => {
-                    setTimeout(() => {
-                        this.net.send({ type: 'JOIN', team: this.myTeam });
-                    }, 300);
-                },
-                onData: (data) => this.handleNetworkData(data),
-                onError: () => {
-                    document.getElementById('lobby-status-msg').textContent = `❌ ルームが見つからないか接続に失敗しました`;
-                }
-            });
+                document.getElementById('lobby-status-msg').textContent = `🔗 ホスト [ID: ${id}] へ接続中...`;
+                this.net.init(id, 'GUEST', this.myTeam, (data) => this.handleNetworkData(data));
+                this.net.send({ type: 'JOIN', team: this.myTeam });
+                this.updateNetworkSignalUI(true, 22);
+                document.getElementById('lobby-status-msg').textContent = `🔗 接続成功！ゲームへ入場します...`;
+                setTimeout(() => this.startPvpGame('ONLINE'), 900);
+            }
         }
+
         startPvpSingleMode() {
             snd.seSelect();
+            this.clearJoinPoll();
             this.pvpSubMode = 'SINGLE';
             this.myTeam = this.hostTeamChoice;
             this.updateNetworkSignalUI(true, 5);
             this.startPvpGame('SINGLE');
         }
+
         startPvpGame(subMode) {
             this.pvpSubMode = subMode;
             document.getElementById('lobby-screen').style.display = 'none';
@@ -900,8 +825,11 @@
             this.gameMode = 'PVP';
             this.startMatchInit();
         }
+
         startMatchInit() {
             this.stopTurnTimer();
+            this.clearScoreTimers();
+            this.gameEnded = false;
             this.inning = 1;
             this.isTop = true;
             this.outs = 0;
@@ -910,14 +838,15 @@
             this.bases = [false, false, false];
             this.foulPairs = [];
             this.pendingFoulPair = null;
+            this.stats = { hits: { visitor: 0, home: 0 }, errors: { visitor: 0, home: 0 }, homeRuns: { visitor: 0, home: 0 } };
             this.resetHands();
-            
+
             this.isFlagOpened = false;
             this.playerFlagReady = false;
             this.opponentFlagReady = false;
             this.playerReady = false;
             this.opponentReady = false;
-            
+
             if (this.gameMode === 'CPU') {
                 this.isTeamLocked = false;
                 this.currentPhase = 'START_MOVE';
@@ -927,99 +856,71 @@
                 this.isTeamLocked = true;
                 this.currentPhase = 'ROUTINE_1_STATUS';
                 this.justStartedPlayBall = true;
+                if (this.pvpSubMode === 'SINGLE') {
+                    this.opponentFlagReady = true;
+                }
                 snd.playOpeningFanfare();
                 this.updateBoardAndCommentary("熱気渦巻くエキシビションナイター！プレイボール！");
                 this.startTurnTimer();
             }
             this.renderAll();
         }
-        
-        handleNetworkData(data) {
-            if (!data) return;
-            if (data.type === 'JOIN') {
-                if (this.gameMode !== 'PVP' && this.netRole === 'HOST') {
-                    this.updateNetworkSignalUI(true, 15);
-                    document.getElementById('lobby-status-msg').textContent = `🔗 ゲスト合流成功！プレイボール！`;
-                    this.net.send({ type: 'START_MATCH', hostTeam: this.hostTeamChoice });
-                    setTimeout(() => this.startPvpGame('ONLINE'), 700);
-                }
-                return;
-            }
-            if (data.type === 'START_MATCH') {
-                if (data.hostTeam) {
-                    this.hostTeamChoice = data.hostTeam;
-                    this.myTeam = (this.netRole === 'HOST') ? data.hostTeam : ((data.hostTeam === 'REDS') ? 'BLACKS' : 'REDS');
-                }
-                this.updateNetworkSignalUI(true, 18);
-                if (document.getElementById('lobby-screen').style.display !== 'none') {
-                    this.startPvpGame('ONLINE');
-                }
-                return;
-            }
-            if (data.type === 'REMATCH_REQUEST') {
-                document.getElementById('rematch-modal').style.display = 'flex';
-                return;
-            }
-            if (data.type === 'REMATCH_ACCEPT') {
-                document.getElementById('rematch-modal').style.display = 'none';
-                this.restartMatch();
-                return;
-            }
-            if (data.type === 'REMATCH_DECLINE') {
-                document.getElementById('rematch-modal').style.display = 'none';
-                this.updateBoardAndCommentary("対戦相手が再戦を辞退しました。");
-                return;
-            }
-            if (data.type === 'PEER_DISCONNECTED') {
-                this.stopTurnTimer();
-                this.updateBoardAndCommentary("通信相手との接続が切れました。通信シングルへ切り替えるかタイトルへ戻ってください。");
-                this.renderAll();
-                return;
-            }
 
-            if (this.gameMode !== 'PVP') return;
+        handleNetworkData(data) {
+            if (this.gameMode !== 'PVP' || !data || this.gameEnded) return;
 
             if (data.type === 'FLAG_READY') {
-                if (data.senderRole !== this.netRole) {
-                    this.opponentFlagReady = true;
-                    this.checkBothFlagReadyAndOpen();
-                }
-            } else if (data.type === 'FLAG_OPENED') {
-                if (data.senderRole !== this.netRole && !this.isFlagOpened) {
-                    this.applyOpenedFlagState(data.flagDeck, data.currentCase);
-                }
+                this.opponentFlagReady = true;
+                this.checkBothFlagReadyAndOpen();
             } else if (data.type === 'CARD_SELECT') {
-                if (data.senderRole !== this.netRole) {
+                if (data.card) {
                     if (this.myTeam === 'REDS') this.battleCards.home = data.card;
                     else this.battleCards.visitor = data.card;
-                    this.opponentReady = true;
-                    this.checkBothReadyAndBattle();
                 }
+                this.opponentReady = true;
+                this.checkBothReadyAndBattle();
             } else if (data.type === 'BATTLE_RESULT') {
                 this.stopTurnTimer();
-                this.flagDeck = data.flagDeck;
-                this.currentCase = data.currentCase;
-                this.battleCards = data.battleCards;
-                this.lastBattleSuccess = data.success;
-                this.pendingFoulPair = data.foulPair || null;
-                this.triggerGiantTextEffect('BATTLE');
-                this.triggerCountdownSequence(() => {
-                    this.triggerBattleOutcomeDisplay(!!data.isFoul, true);
-                });
+                this.flagDeck = data.flagDeck || this.flagDeck;
+                this.currentCase = data.currentCase || this.currentCase;
+                this.battleCards = data.battleCards || this.battleCards;
+                this.lastBattleSuccess = !!data.success;
+                this.isFoul = !!data.isFoul;
+                if (data.isFoul) {
+                    this.pendingFoulPair = data.foulPair || null;
+                    this.triggerBattleOutcomeDisplay(true);
+                } else {
+                    this.triggerBattleOutcomeDisplay(false);
+                }
             } else if (data.type === 'NEXT_ROUND') {
-                this.applySyncedRoundState(data.state);
+                this.executePhase4_ResetAndNext(true);
+            } else if (data.type === 'FOUL_RESET') {
+                this.executePhase4_FoulReset(true);
+            } else if (data.type === 'REMATCH_REQ') {
+                document.getElementById('rematch-modal').style.display = 'flex';
+            } else if (data.type === 'REMATCH_ACCEPT') {
+                document.getElementById('rematch-modal').style.display = 'none';
+                this.restartMatch();
+            } else if (data.type === 'REMATCH_DECLINE') {
+                document.getElementById('rematch-modal').style.display = 'none';
+                alert("対戦相手が再戦を辞退しました。タイトルへ戻ります。");
+                this.returnToTitle();
             }
         }
 
         getOffenseRole() { return this.isTop ? 'visitor' : 'home'; }
         getDefenseRole() { return this.isTop ? 'home' : 'visitor'; }
-        
+
         startTurnTimer() {
             this.stopTurnTimer();
-            if (this.gameMode !== 'PVP') return;
+            if (this.gameMode !== 'PVP' || this.gameEnded) return;
             this.timeLeft = 30;
             this.updateIndependentTimerDisplay();
             this.turnTimer = setInterval(() => {
+                if (this.gameEnded) {
+                    this.stopTurnTimer();
+                    return;
+                }
                 this.timeLeft--;
                 this.updateIndependentTimerDisplay();
                 if (this.timeLeft <= 0) {
@@ -1028,39 +929,40 @@
                 }
             }, 1000);
         }
+
         stopTurnTimer() {
             if (this.turnTimer) {
                 clearInterval(this.turnTimer);
                 this.turnTimer = null;
             }
         }
+
         updateIndependentTimerDisplay() {
             this.renderAll();
         }
+
         handleTimeOutAutoAction() {
-            if (this.gameMode === 'PVP') {
-                if (this.currentPhase === 'ROUTINE_1_STATUS' && !this.isFlagOpened) {
-                    this.playerFlagReady = true;
-                    this.opponentFlagReady = true;
-                    this.executePhase1_FlagOpen();
-                } else if (this.currentPhase === 'ROUTINE_2_SELECT') {
-                    if (this.selectedCardIndex === null) {
-                        let currentHand = this.handsData[this.myTeam];
-                        let unusedIndices = currentHand.map((c, i) => c.used ? null : i).filter(v => v !== null);
-                        if (unusedIndices.length > 0) {
-                            let randIdx = unusedIndices[Math.floor(Math.random() * unusedIndices.length)];
-                            this.selectCard(randIdx);
-                        }
+            if (this.gameMode !== 'PVP' || this.gameEnded) return;
+            if (this.currentPhase === 'ROUTINE_1_STATUS' && !this.isFlagOpened) {
+                this.playerFlagReady = true;
+                this.opponentFlagReady = true;
+                this.executePhase1_FlagOpen();
+            } else if (this.currentPhase === 'ROUTINE_2_SELECT' && !this.playerReady) {
+                if (this.selectedCardIndex === null) {
+                    let currentHand = this.handsData[this.myTeam];
+                    let unusedIndices = currentHand.map((c, i) => c.used ? null : i).filter(v => v !== null);
+                    if (unusedIndices.length > 0) {
+                        let randIdx = unusedIndices[Math.floor(Math.random() * unusedIndices.length)];
+                        this.selectCard(randIdx);
                     }
-                    this.tryConfirmSetup();
                 }
+                this.tryConfirmSetup();
             }
         }
+
         onVsPanelTapped() {
             snd.init();
-            if (this.gameMode === 'PVP') {
-                this.startTurnTimer();
-            }
+            if (this.gameEnded) return;
 
             if (this.gameMode === 'CPU') {
                 switch (this.currentPhase) {
@@ -1090,8 +992,8 @@
                 }
             } else {
                 switch (this.currentPhase) {
-                    case 'ROUTINE_1_STATUS': 
-                        if (!this.playerFlagReady) {
+                    case 'ROUTINE_1_STATUS':
+                        if (!this.playerFlagReady && !this.isFlagOpened) {
                             this.playerFlagReady = true;
                             if (this.pvpSubMode === 'ONLINE') {
                                 this.net.send({ type: 'FLAG_READY' });
@@ -1102,30 +1004,35 @@
                             this.checkBothFlagReadyAndOpen();
                         }
                         break;
-                    case 'ROUTINE_2_SELECT': this.tryConfirmSetup(); break;
-                    case 'ROUTINE_3_RESULT': this.executePhase4_ResetAndNext(); break;
-                    case 'ROUTINE_3_FOUL': this.executePhase4_FoulReset(); break;
-                    default: this.renderAll(); break;
+                    case 'ROUTINE_2_SELECT':
+                        this.tryConfirmSetup();
+                        break;
+                    case 'ROUTINE_3_RESULT':
+                        this.executePhase4_ResetAndNext();
+                        break;
+                    case 'ROUTINE_3_FOUL':
+                        this.executePhase4_FoulReset();
+                        break;
+                    default:
+                        this.renderAll();
+                        break;
                 }
             }
         }
+
         onBoardOrFlagTapped() {
             this.onVsPanelTapped();
         }
-        
+
         checkBothFlagReadyAndOpen() {
             if (this.gameMode === 'PVP' && this.playerFlagReady && this.opponentFlagReady && !this.isFlagOpened) {
-                if (this.pvpSubMode === 'ONLINE' && this.netRole !== 'HOST') {
-                    this.renderAll();
-                    return;
-                }
                 this.executePhase1_FlagOpen();
             } else {
                 this.renderAll();
             }
         }
 
-        applyOpenedFlagState(flagDeck, currentCase) {
+        executePhase1_FlagOpen() {
             this.justStartedPlayBall = false;
             this.currentPhase = 'ROUTINE_2_SELECT';
             this.isFlagOpened = true;
@@ -1136,36 +1043,22 @@
             this.battleCards.visitor = null;
             this.battleCards.home = null;
             this.selectedCardIndex = null;
-            this.flagDeck = flagDeck;
-            this.currentCase = currentCase;
 
             snd.seThemeJingle();
             this.triggerGiantTextEffect('OPEN');
+            const flagValues = [2,3,4,5,6,7,8,9,10];
+            this.flagDeck.visitorVal = flagValues[Math.floor(Math.random() * flagValues.length)];
+            this.flagDeck.homeVal = flagValues[Math.floor(Math.random() * flagValues.length)];
+            this.currentCase = this.evaluateCase(this.flagDeck.visitorVal, this.flagDeck.homeVal);
+
             this.updateBoardAndCommentary("さぁ、この打席の行方を左右する緊迫の瞬間！スタンドからも大歓声が送られます！");
             if (this.gameMode === 'PVP') this.startTurnTimer();
             this.renderAll();
         }
 
-        executePhase1_FlagOpen() {
-            const flagValues = [2,3,4,5,6,7,8,9,10];
-            const nextFlagDeck = {
-                visitorVal: flagValues[Math.floor(Math.random() * flagValues.length)],
-                homeVal: flagValues[Math.floor(Math.random() * flagValues.length)]
-            };
-            const nextCase = this.evaluateCase(nextFlagDeck.visitorVal, nextFlagDeck.homeVal);
-
-            if (this.gameMode === 'PVP' && this.pvpSubMode === 'ONLINE' && this.netRole === 'HOST') {
-                this.net.send({
-                    type: 'FLAG_OPENED',
-                    flagDeck: nextFlagDeck,
-                    currentCase: nextCase
-                });
-            }
-            this.applyOpenedFlagState(nextFlagDeck, nextCase);
-        }
         triggerGiantTextEffect(type) {
             let overlay = document.getElementById('action-effect-overlay');
-            if(!overlay) return;
+            if (!overlay) return;
             overlay.innerHTML = '';
             if (type === 'OPEN') {
                 let tTop = document.createElement('div');
@@ -1185,20 +1078,20 @@
                 setTimeout(() => { overlay.innerHTML = ''; }, 900);
             }
         }
-        selectCard(idx){
-            if(!this.isFlagOpened || this.currentPhase !== 'ROUTINE_2_SELECT' || (this.gameMode === 'PVP' && this.playerReady)) return;
+
+        selectCard(idx) {
+            if (!this.isFlagOpened || this.currentPhase !== 'ROUTINE_2_SELECT' || (this.gameMode === 'PVP' && this.playerReady) || this.gameEnded) return;
             let currentHand = this.handsData[this.myTeam];
-            if(currentHand[idx].used) return;
-            
+            if (!currentHand[idx] || currentHand[idx].used) return;
+
             if (this.selectedCardIndex !== null) {
                 currentHand[this.selectedCardIndex].used = false;
             }
-
             snd.seCardSetup();
             this.selectedCardIndex = idx;
             currentHand[idx].used = true;
             let chosenCard = currentHand[idx];
-            
+
             if (this.gameMode === 'PVP') {
                 if (this.myTeam === 'REDS') this.battleCards.visitor = chosenCard;
                 else this.battleCards.home = chosenCard;
@@ -1208,8 +1101,9 @@
             }
             this.renderAll();
         }
-        returnCardFromBattle(side) {
-            if (!this.isFlagOpened || this.currentPhase !== 'ROUTINE_2_SELECT' || (this.gameMode === 'PVP' && this.playerReady)) return;
+
+        returnCardFromBattle() {
+            if (!this.isFlagOpened || this.currentPhase !== 'ROUTINE_2_SELECT' || (this.gameMode === 'PVP' && this.playerReady) || this.gameEnded) return;
             if (this.selectedCardIndex !== null) {
                 snd.seCardSetup();
                 let currentHand = this.handsData[this.myTeam];
@@ -1225,23 +1119,19 @@
                 this.renderAll();
             }
         }
+
         tryConfirmSetup() {
-            if (this.currentPhase !== 'ROUTINE_2_SELECT' || this.selectedCardIndex === null) return;
+            if (this.currentPhase !== 'ROUTINE_2_SELECT' || this.selectedCardIndex === null || this.gameEnded) return;
             if (this.gameMode === 'PVP' && this.playerReady) return;
-            
+
             let currentHand = this.handsData[this.myTeam];
             let chosenCard = currentHand[this.selectedCardIndex];
-            
-            let myBattleCard = chosenCard;
+            let myBattleCard = { id: chosenCard.id, rank: chosenCard.rank, color: chosenCard.color, used: true };
+
             if (this.gameMode === 'PVP') {
                 if (this.myTeam === 'REDS') this.battleCards.visitor = myBattleCard;
                 else this.battleCards.home = myBattleCard;
-            } else {
-                if (this.myTeam === 'BLACKS') this.battleCards.visitor = myBattleCard;
-                else this.battleCards.home = myBattleCard;
-            }
 
-            if (this.gameMode === 'PVP') {
                 this.playerReady = true;
                 if (this.pvpSubMode === 'ONLINE') {
                     this.net.send({
@@ -1249,9 +1139,8 @@
                         card: myBattleCard
                     });
                 }
-                let aiTeam = (this.myTeam === 'REDS') ? 'BLACKS' : 'REDS';
-
                 if (this.pvpSubMode === 'SINGLE' && !this.opponentReady) {
+                    let aiTeam = (this.myTeam === 'REDS') ? 'BLACKS' : 'REDS';
                     let oppPool = this.handsData[aiTeam];
                     let unusedOpp = oppPool.filter(c => !c.used);
                     if (unusedOpp.length === 0) {
@@ -1260,31 +1149,37 @@
                     }
                     let aiCard = unusedOpp[Math.floor(Math.random() * unusedOpp.length)];
                     aiCard.used = true;
-                    if (aiTeam === 'REDS') this.battleCards.visitor = aiCard;
-                    else this.battleCards.home = aiCard;
+                    let aiBattleCard = { id: aiCard.id, rank: aiCard.rank, color: aiCard.color, used: true };
+                    if (aiTeam === 'REDS') this.battleCards.visitor = aiBattleCard;
+                    else this.battleCards.home = aiBattleCard;
                     this.opponentReady = true;
                 }
 
-                if (this.pvpSubMode === 'SINGLE') {
+                if (this.pvpSubMode === 'SINGLE' || (this.playerReady && this.opponentReady)) {
                     this.checkBothReadyAndBattle();
                 } else {
                     this.updateBoardAndCommentary("ベンチのサインが交錯する！互いの切札を秘めた心理戦、勝負の行方は…！");
                     this.renderAll();
                 }
             } else {
+                if (this.myTeam === 'BLACKS') this.battleCards.visitor = myBattleCard;
+                else this.battleCards.home = myBattleCard;
                 this.executePhase3_Battle();
             }
         }
+
         checkBothReadyAndBattle() {
             if (this.gameMode === 'PVP' && this.playerReady && this.opponentReady) {
                 this.stopTurnTimer();
-                if (this.pvpSubMode === 'ONLINE' && this.netRole !== 'HOST') {
+                if (this.pvpSubMode === 'SINGLE' || this.netRole === 'HOST') {
+                    this.executePhase3_Battle();
+                } else {
+                    this.updateBoardAndCommentary("両チームのカードが出揃った！勝負の判定へ…！");
                     this.renderAll();
-                    return;
                 }
-                this.executePhase3_Battle();
             }
         }
+
         executePhase3_Battle() {
             if (this.gameMode !== 'PVP') {
                 let cpuTeam = (this.myTeam === 'BLACKS') ? 'REDS' : 'BLACKS';
@@ -1296,12 +1191,12 @@
                 }
                 let cpuCard = unusedCpu[Math.floor(Math.random() * unusedCpu.length)];
                 cpuCard.used = true;
-                if (cpuTeam === 'BLACKS') this.battleCards.visitor = cpuCard;
-                else this.battleCards.home = cpuCard;
+                let cpuBattleCard = { id: cpuCard.id, rank: cpuCard.rank, color: cpuCard.color, used: true };
+                if (cpuTeam === 'BLACKS') this.battleCards.visitor = cpuBattleCard;
+                else this.battleCards.home = cpuBattleCard;
             }
 
             this.triggerGiantTextEffect('BATTLE');
-
             if (this.gameMode === 'PVP') {
                 this.stopTurnTimer();
                 this.triggerCountdownSequence(() => this.processBattleOutcome());
@@ -1309,6 +1204,7 @@
                 this.processBattleOutcome();
             }
         }
+
         triggerCountdownSequence(callback) {
             let overlay = document.getElementById('countdown-overlay');
             overlay.style.display = 'flex';
@@ -1328,12 +1224,623 @@
                     overlay.style.display = 'none';
                     if (typeof callback === 'function') callback();
                 }
-            }, 600);
+            }, 500);
         }
+
         processBattleOutcome() {
             let offenseRole = this.getOffenseRole();
             let defenseRole = this.getDefenseRole();
             let visitorCard = this.battleCards.visitor || { rank: 'K', color: 'black' };
             let homeCard = this.battleCards.home || { rank: 'K', color: 'red' };
-            
-            let visitorWin = (visitorCard.rank === 'J' && homeCard.rank === 'A') ? true : (homeCard.rank === 'J' && visitorCard.rank === 'A') ? false : this.getRankVal(visitorCard.rank) >= this.getRankVal(homeCard
+
+            let visitorWin = (visitorCard.rank === 'J' && homeCard.rank === 'A')
+                ? true
+                : (homeCard.rank === 'J' && visitorCard.rank === 'A')
+                    ? false
+                    : this.getRankVal(visitorCard.rank) >= this.getRankVal(homeCard.rank);
+            let isFoul = (visitorCard.rank === homeCard.rank);
+
+            if (isFoul) {
+                this.pendingFoulPair = {
+                    visitor: visitorCard.rank,
+                    home: homeCard.rank,
+                    visitorColor: visitorCard.color,
+                    homeColor: homeCard.color
+                };
+                if (this.gameMode === 'PVP' && this.pvpSubMode === 'ONLINE' && this.netRole === 'HOST') {
+                    this.net.send({
+                        type: 'BATTLE_RESULT',
+                        flagDeck: this.flagDeck,
+                        currentCase: this.currentCase,
+                        battleCards: this.battleCards,
+                        isFoul: true,
+                        foulPair: this.pendingFoulPair
+                    });
+                }
+                this.triggerBattleOutcomeDisplay(true);
+                return;
+            }
+
+            let winningRole = visitorWin ? 'visitor' : 'home';
+            let finalOffenseSuccess = (winningRole === offenseRole);
+            if (this.currentCase.caseNum === "CASE④") {
+                finalOffenseSuccess = !finalOffenseSuccess;
+                this.stats.errors[defenseRole]++;
+            }
+            this.lastBattleSuccess = finalOffenseSuccess;
+
+            if (this.gameMode === 'PVP' && this.pvpSubMode === 'ONLINE' && this.netRole === 'HOST') {
+                this.net.send({
+                    type: 'BATTLE_RESULT',
+                    flagDeck: this.flagDeck,
+                    currentCase: this.currentCase,
+                    battleCards: this.battleCards,
+                    isFoul: false,
+                    success: finalOffenseSuccess
+                });
+            }
+            this.triggerBattleOutcomeDisplay(false);
+        }
+
+        triggerBattleOutcomeDisplay(isFoul) {
+            this.selectedCardIndex = null;
+            this.clearScoreTimers();
+
+            if (isFoul) {
+                this.currentPhase = 'ROUTINE_3_FOUL';
+                snd.playTone(440, 0.1);
+                setTimeout(() => snd.seUmpireFoul(), 600);
+                this.updateBoardAndCommentary("カキーン！鋭い打球はファールボール！スタンドへ飛び込みました！");
+                if (this.gameMode === 'PVP') this.startTurnTimer();
+                this.renderAll();
+                return;
+            }
+
+            this.currentPhase = 'ROUTINE_3_RESULT';
+            let offenseRole = this.getOffenseRole();
+            let finalOffenseSuccess = this.lastBattleSuccess;
+            const cNum = this.currentCase.caseNum;
+            let commentaryText = "";
+
+            if (finalOffenseSuccess) {
+                if (cNum === "CASE⑨") {
+                    this.stats.homeRuns[offenseRole]++;
+                    this.stats.hits[offenseRole]++;
+                    snd.playHomerunFanfare();
+                    commentaryText = "完璧に捉えた！一撃必殺のケース、特大のホームランだ！";
+                } else if (cNum === "CASE⑤" || cNum === "CASE⑥") {
+                    snd.seHitSequence();
+                    commentaryText = "見事な走塁・作戦成功！ランナーが確実に進塁を決めた！";
+                } else {
+                    this.stats.hits[offenseRole]++;
+                    snd.seHitSequence();
+                    commentaryText = "見事に捉えた！鋭い打球が抜けるクリーンヒット！";
+                }
+            } else {
+                if (cNum === "CASE⑤" || cNum === "CASE⑥") {
+                    snd.seOutSequence();
+                    commentaryText = "バッテリーの好リード！盗塁・進塁の試みが完璧に阻止された！";
+                } else {
+                    snd.seOutSequence();
+                    commentaryText = "好守に阻まれた！バットの芯を外す痛烈なアウト！";
+                }
+            }
+
+            this.updateBoardAndCommentary(commentaryText);
+            let oldScore = this.scores[offenseRole];
+            this.applyCorrectCaseResult(finalOffenseSuccess);
+            let scoreAdded = Math.max(0, this.scores[offenseRole] - oldScore);
+
+            if (scoreAdded > 0) {
+                this.inningScores[offenseRole][this.inning - 1] = (this.inningScores[offenseRole][this.inning - 1] || 0) + scoreAdded;
+                this.scores[offenseRole] = oldScore;
+                let currentDisplayedScore = oldScore;
+
+                for (let i = 1; i <= scoreAdded; i++) {
+                    const t = setTimeout(() => {
+                        if (this.gameEnded) return;
+                        currentDisplayedScore++;
+                        this.scores[offenseRole] = currentDisplayedScore;
+                        snd.seScoreCountStep();
+                        this.renderAll();
+                        if (i === scoreAdded) {
+                            this.checkMercyOrWalkoffWin();
+                        }
+                    }, i * 550);
+                    this.scoreTimers.push(t);
+                }
+            } else {
+                this.checkMercyOrWalkoffWin();
+            }
+
+            if (this.gameMode === 'PVP' && !this.gameEnded) this.startTurnTimer();
+            this.renderAll();
+        }
+
+        checkMercyOrWalkoffWin() {
+            if (this.gameEnded) return false;
+            let diff = Math.abs(this.scores.visitor - this.scores.home);
+
+            // 1. 10点差コールドゲーム判定
+            if (diff >= 10) {
+                this.gameEnded = true;
+                this.stopTurnTimer();
+                setTimeout(() => {
+                    alert("【コールドゲーム宣言】\n10点差以上の大差がついたため、コールドゲーム成立です！");
+                    this.endGame(true);
+                }, 350);
+                return true;
+            }
+
+            // 2. サヨナラゲーム判定：【最終回（3回）の裏】で、ホームチームがリードを奪った瞬間のみ発動！
+            if (this.inning >= 3 && !this.isTop && this.scores.home > this.scores.visitor) {
+                this.gameEnded = true;
+                this.stopTurnTimer();
+                setTimeout(() => {
+                    alert("【サヨナラゲーム！】\n最終回裏の攻撃でホームチームが勝ち越し！劇的なサヨナラ勝利です！");
+                    this.endGame(true);
+                }, 350);
+                return true;
+            }
+            return false;
+        }
+
+        executePhase4_FoulReset(fromRemote = false) {
+            if (this.gameEnded) return;
+            if (!fromRemote && this.gameMode === 'PVP' && this.pvpSubMode === 'ONLINE') {
+                this.net.send({ type: 'FOUL_RESET' });
+            }
+            snd.seGroundMaintenance();
+            if (this.pendingFoulPair) {
+                this.foulPairs.push(this.pendingFoulPair);
+                this.pendingFoulPair = null;
+                if (this.foulPairs.length >= 7) {
+                    this.foulPairs = [];
+                    this.resetHands();
+                }
+            }
+            this.battleCards.visitor = null;
+            this.battleCards.home = null;
+            this.selectedCardIndex = null;
+            this.playerReady = false;
+            this.opponentReady = false;
+            this.currentPhase = 'ROUTINE_2_SELECT';
+            this.isFlagOpened = true;
+            this.updateBoardAndCommentary("カウントは変わらず！同じケースで仕切り直しの打ち直しだ！");
+            if (this.gameMode === 'PVP') this.startTurnTimer();
+            this.renderAll();
+        }
+
+        executePhase4_ResetAndNext(fromRemote = false) {
+            if (this.gameEnded) return;
+            if (!fromRemote && this.gameMode === 'PVP' && this.pvpSubMode === 'ONLINE') {
+                this.net.send({ type: 'NEXT_ROUND' });
+            }
+
+            if (this.inning === 3 && !this.isTop && this.scores.home > this.scores.visitor) {
+                this.endGame();
+                return;
+            }
+            if (this.inning === 3 && this.isTop && this.outs >= 3 && this.scores.home > this.scores.visitor) {
+                this.endGame();
+                return;
+            }
+            if (this.outs >= 3) {
+                snd.seChange();
+                this.outs = 0;
+                this.bases = [false, false, false];
+                this.isTop = !this.isTop;
+                if (!this.isTop && this.inning === 3 && this.scores.home > this.scores.visitor) {
+                    this.endGame();
+                    return;
+                }
+                if (this.isTop) {
+                    this.inning++;
+                    if (this.inning > 3) {
+                        this.endGame();
+                        return;
+                    }
+                }
+            } else {
+                snd.seGroundMaintenance();
+            }
+
+            this.resetHands();
+            this.currentPhase = 'ROUTINE_1_STATUS';
+            this.isFlagOpened = false;
+            this.justStartedPlayBall = false;
+            this.playerFlagReady = false;
+            this.opponentFlagReady = (this.gameMode === 'PVP' && this.pvpSubMode === 'SINGLE');
+            this.foulPairs = [];
+            this.pendingFoulPair = null;
+            this.battleCards.visitor = null;
+            this.battleCards.home = null;
+            this.selectedCardIndex = null;
+            this.playerReady = false;
+            this.opponentReady = false;
+
+            this.updateBoardAndCommentary("攻守の陣形が整います！次の打席へ！");
+            if (this.gameMode === 'PVP') this.startTurnTimer();
+            this.renderAll();
+        }
+
+        endGame(alreadyMarkedEnded = false) {
+            if (!alreadyMarkedEnded && this.gameEnded) return;
+            this.gameEnded = true;
+            this.stopTurnTimer();
+            this.clearScoreTimers();
+            snd.playGameSetFanfare();
+
+            let winnerRole = this.scores.home > this.scores.visitor ? 'home' : (this.scores.visitor > this.scores.home ? 'visitor' : 'DRAW');
+            let newsTitleText = (this.gameMode === 'PVP') ? "速報：ブラックドーム・ナイター試合結果" : "速報：デーゲーム試合結果";
+            document.getElementById('news-title-txt').textContent = newsTitleText;
+
+            let vName = (this.gameMode === 'PVP') ? 'REDS' : 'BLACKS';
+            let hName = (this.gameMode === 'PVP') ? 'BLACKS' : 'REDS';
+
+            let tableHtml = `<tr><th>TEAM</th><th>1</th><th>2</th><th>3</th><th>R</th><th>H</th><th>E</th></tr>`;
+            tableHtml += `<tr><td>${vName} (V)</td><td>${this.inningScores.visitor[0]||0}</td><td>${this.inningScores.visitor[1]||0}</td><td>${this.inningScores.visitor[2]||0}</td><td><b>${this.scores.visitor}</b></td><td>${this.stats.hits.visitor}</td><td>${this.stats.errors.visitor}</td></tr>`;
+            tableHtml += `<tr><td>${hName} (H)</td><td>${this.inningScores.home[0]||0}</td><td>${this.inningScores.home[1]||0}</td><td>${this.inningScores.home[2]||0}</td><td><b>${this.scores.home}</b></td><td>${this.stats.hits.home}</td><td>${this.stats.errors.home}</td></tr>`;
+
+            document.getElementById('news-score-table').innerHTML = tableHtml;
+            let winName = winnerRole === 'DRAW' ? '引き分け' : (winnerRole === 'home' ? hName : vName);
+            let statsHtml = `<b>【試合速報】</b> 白熱のゲームセット！勝者：${winName}`;
+            document.getElementById('news-stats-content').innerHTML = statsHtml;
+            document.getElementById('result-screen').style.display = 'flex';
+        }
+
+        requestRematch() {
+            snd.seSelect();
+            if (this.gameMode === 'CPU' || this.pvpSubMode === 'SINGLE') {
+                this.restartMatch();
+            } else {
+                this.net.send({ type: 'REMATCH_REQ' });
+                document.getElementById('news-stats-content').innerHTML += `<br><span style="color:#00E5FF;">再戦リクエストを送信しました。相手の応答を待っています…</span>`;
+            }
+        }
+
+        acceptRematch() {
+            snd.seSelect();
+            document.getElementById('rematch-modal').style.display = 'none';
+            if (this.gameMode === 'PVP' && this.pvpSubMode === 'ONLINE') {
+                this.net.send({ type: 'REMATCH_ACCEPT' });
+            }
+            this.restartMatch();
+        }
+
+        declineRematch() {
+            snd.seSelect();
+            document.getElementById('rematch-modal').style.display = 'none';
+            if (this.gameMode === 'PVP' && this.pvpSubMode === 'ONLINE') {
+                this.net.send({ type: 'REMATCH_DECLINE' });
+            }
+            this.returnToTitle();
+        }
+
+        restartMatch() {
+            document.getElementById('result-screen').style.display = 'none';
+            this.startMatchInit();
+        }
+
+        returnToTitle() {
+            this.stopTurnTimer();
+            this.clearScoreTimers();
+            this.clearJoinPoll();
+            this.net.close();
+            this.gameEnded = false;
+            snd.init();
+            document.getElementById('result-screen').style.display = 'none';
+            document.getElementById('rematch-modal').style.display = 'none';
+            document.getElementById('game-container').style.display = 'none';
+            document.getElementById('lobby-screen').style.display = 'none';
+            document.getElementById('title-screen').style.display = 'flex';
+            this.currentPhase = 'START_MOVE';
+            this.isTeamLocked = false;
+            this.justStartedPlayBall = false;
+            this.inning = 1;
+            this.isTop = true;
+            this.outs = 0;
+            this.scores = { visitor: 0, home: 0 };
+            this.inningScores = { visitor: [0,0,0], home: [0,0,0] };
+            this.bases = [false, false, false];
+            this.selectedCardIndex = null;
+            this.isFlagOpened = false;
+            this.battleCards = { visitor: null, home: null };
+            this.playerFlagReady = false;
+            this.opponentFlagReady = false;
+            this.playerReady = false;
+            this.opponentReady = false;
+            this.foulPairs = [];
+            this.pendingFoulPair = null;
+            this.resetHands();
+            this.renderAll();
+        }
+
+        evaluateCase(visitorVal, homeVal) {
+            let d = Math.abs(visitorVal - homeVal);
+            if (d === 1) return { caseNum: "CASE①", description: "ヒット or 1アウト" };
+            if (d === 2) return { caseNum: "CASE②", description: "2Bヒット or 1アウト" };
+            if (d === 3) return { caseNum: "CASE③", description: "3Bヒット or 1アウト" };
+            if (d === 4) return { caseNum: "CASE④", description: "バッドフラグ（勝敗反転）" };
+            if (d === 5) return { caseNum: "CASE⑤", description: this.bases.some(Boolean) ? "盗塁・進塁 or 盗塁阻止(アウト)" : "シングルヒット or 1アウト" };
+            if (d === 6) return { caseNum: "CASE⑥", description: (this.bases.some(Boolean) && this.outs < 2) ? "送りバント成功 or 阻止" : "シングルヒット or 1アウト" };
+            if (d === 7) return { caseNum: "CASE⑦", description: "2Bヒット or Wプレー" };
+            if (d === 8) return { caseNum: "CASE⑧", description: "強襲ヒット or 3者凡退" };
+            return { caseNum: "CASE⑨", description: "ホームラン or アウト" };
+        }
+
+        getRankVal(r) { return r === 'A' ? 4 : r === 'K' ? 3 : r === 'Q' ? 2 : 1; }
+
+        applyCorrectCaseResult(ok) {
+            let c = this.currentCase.caseNum, ofs = this.getOffenseRole();
+            if (ok) {
+                if (c === "CASE⑨") {
+                    let scored = (this.bases[0] ? 1 : 0) + (this.bases[1] ? 1 : 0) + (this.bases[2] ? 1 : 0) + 1;
+                    this.scores[ofs] += scored;
+                    this.bases = [false, false, false];
+                } else if (c === "CASE③") {
+                    let scored = (this.bases[0] ? 1 : 0) + (this.bases[1] ? 1 : 0) + (this.bases[2] ? 1 : 0);
+                    this.scores[ofs] += scored;
+                    this.bases = [false, false, true];
+                } else if (c === "CASE②" || c === "CASE⑦") {
+                    let scored = 0;
+                    if (this.bases[2]) { scored++; this.bases[2] = false; }
+                    if (this.bases[1]) { scored++; this.bases[1] = false; }
+                    if (this.bases[0]) { this.bases[2] = true; this.bases[0] = false; }
+                    this.bases[1] = true;
+                    if (scored > 0) this.scores[ofs] += scored;
+                } else if (c === "CASE⑤" || c === "CASE⑥") {
+                    if (this.bases[2]) { this.scores[ofs]++; this.bases[2] = false; }
+                    if (this.bases[1]) { this.bases[2] = true; this.bases[1] = false; }
+                    if (this.bases[0]) { this.bases[1] = true; this.bases[0] = false; }
+                } else {
+                    let scored = 0;
+                    if (this.bases[2]) { scored++; this.bases[2] = false; }
+                    if (this.bases[1]) { this.bases[2] = true; this.bases[1] = false; }
+                    if (this.bases[0]) { this.bases[1] = true; this.bases[0] = false; }
+                    this.bases[0] = true;
+                    if (scored > 0) this.scores[ofs] += scored;
+                }
+            } else {
+                if (c === "CASE⑤" || c === "CASE⑥") {
+                    if (this.bases[0]) this.bases[0] = false;
+                    else if (this.bases[1]) this.bases[1] = false;
+                    else if (this.bases[2]) this.bases[2] = false;
+                    this.outs++;
+                } else if (c === "CASE⑧") this.outs += 3;
+                else if (c === "CASE⑦") { this.outs += 2; this.bases[0] = false; }
+                else this.outs++;
+            }
+        }
+
+        updateBoardAndCommentary(k1) {
+            let cm = document.getElementById('commentary-box');
+            if (cm) cm.innerHTML = `<span style="color:#fff;">${k1}</span>`;
+        }
+
+        applyTeamBoardsLayout() {
+            let cb = document.getElementById('case-box');
+            let sb = document.getElementById('sub-guide-box');
+            let tb = document.getElementById('timer-board-el');
+            if (!cb || !sb || !tb) return;
+
+            let isPlayerVisitor = (this.gameMode === 'CPU') ? (this.myTeam === 'BLACKS') : (this.myTeam === 'REDS');
+            let mainPosCls = isPlayerVisitor ? "pos-visitor" : "pos-home";
+            let subDiagCls = isPlayerVisitor ? "diag-bottom-right" : "diag-bottom-left";
+            let teamColorCls = (this.myTeam === 'BLACKS') ? "bg-black" : "bg-red";
+
+            cb.className = `board ${mainPosCls} ${teamColorCls}`;
+            sb.className = `sub-guide-board ${subDiagCls} ${teamColorCls}`;
+            sb.style.display = 'flex';
+
+            if (this.gameMode === 'CPU' && this.currentPhase === 'START_MOVE' && !this.isTeamLocked) {
+                if (this.myTeam === 'BLACKS') {
+                    cb.innerHTML = `VISITORルート<br>先攻 BLACKS(攻撃)`;
+                } else {
+                    cb.innerHTML = `HOMEルート<br>後攻 REDS(守備)`;
+                }
+            } else if (this.justStartedPlayBall && this.inning === 1 && this.isTop && this.outs === 0 && !this.isFlagOpened) {
+                cb.innerHTML = `<span style="font-size:13px; color:#ff0; font-weight:900;">プレイボール！</span>`;
+            } else if (this.currentPhase === 'ROUTINE_2_SELECT' || this.currentPhase === 'ROUTINE_3_RESULT' || this.currentPhase === 'ROUTINE_3_FOUL') {
+                cb.innerHTML = `<span style="font-size:12px; color:#ff0; font-weight:900;">${this.currentCase.caseNum}</span><br><span style="font-size:10px; color:#fff; font-weight:bold;">${this.currentCase.description}</span>`;
+            } else {
+                let activeBases = [];
+                if (this.bases[0]) activeBases.push("1塁");
+                if (this.bases[1]) activeBases.push("2塁");
+                if (this.bases[2]) activeBases.push("3塁");
+                let runnerText = activeBases.length === 0 ? "走者なし" : activeBases.join("");
+                let inningText = `${this.inning}回${this.isTop ? '表' : '裏'}`;
+                cb.innerHTML = `<span style="font-size:12px;">${inningText} ${this.outs}アウト</span><br><span style="font-size:10px; color:#ff0; font-weight:900;">${runnerText}</span>`;
+            }
+
+            if (this.gameMode === 'CPU' && this.currentPhase === 'START_MOVE' && !this.isTeamLocked) {
+                sb.innerHTML = "チームを選び<br>VSタップして開始";
+            } else if (this.currentPhase === 'ROUTINE_1_STATUS') {
+                if (this.gameMode === 'PVP' && this.playerFlagReady && !this.opponentFlagReady) {
+                    sb.innerHTML = "フラグ準備完了！<br>相手待機中…";
+                } else {
+                    sb.innerHTML = "VSタップで<br>フラグオープン！";
+                }
+            } else if (this.currentPhase === 'ROUTINE_2_SELECT') {
+                if (this.gameMode === 'PVP' && this.playerReady) {
+                    sb.innerHTML = "セット完了！<br>相手の選択待機中";
+                } else {
+                    sb.innerHTML = "カードを選んで<br>VSをタップ！";
+                }
+            } else if (this.currentPhase === 'ROUTINE_3_FOUL') {
+                sb.innerHTML = "ファール！<br>VSタップで打ち直し";
+            } else if (this.currentPhase === 'ROUTINE_3_RESULT') {
+                sb.innerHTML = "VSタップで<br>次の打席へ！";
+            }
+
+            if (this.gameMode === 'CPU') {
+                tb.style.display = 'none';
+            } else {
+                tb.style.display = 'flex';
+                let timerPosCls = isPlayerVisitor ? "pos-home" : "pos-visitor";
+                tb.className = `timer-board ${timerPosCls}`;
+                let tLbl = document.getElementById('timer-lbl');
+                let tVal = document.getElementById('timer-val');
+                let isWaiting = (this.currentPhase === 'ROUTINE_1_STATUS' && this.playerFlagReady && !this.opponentFlagReady) ||
+                                (this.currentPhase === 'ROUTINE_2_SELECT' && this.playerReady && !this.opponentReady);
+                if (isWaiting) {
+                    tLbl.textContent = "STATUS";
+                    tVal.innerHTML = `<span style="font-size:12px; color:#00E5FF;">wait...</span>`;
+                } else {
+                    tLbl.textContent = "TIMING";
+                    tVal.textContent = `${this.timeLeft}s`;
+                    tVal.style.color = this.timeLeft <= 5 ? '#FF0000' : '#FFD700';
+                }
+            }
+        }
+
+        renderAll() {
+            let vName = (this.gameMode === 'PVP') ? 'REDS' : 'BLACKS';
+            let hName = (this.gameMode === 'PVP') ? 'BLACKS' : 'REDS';
+
+            document.getElementById('left-team-name').textContent = vName;
+            document.getElementById('right-team-name').textContent = hName;
+            document.getElementById('left-score').textContent = this.scores.visitor;
+            document.getElementById('right-score').textContent = this.scores.home;
+
+            let offenseRole = this.getOffenseRole();
+            let leftIsOffense = (offenseRole === 'visitor');
+            let rightIsOffense = (offenseRole === 'home');
+
+            if (this.gameMode === 'PVP') {
+                document.getElementById('header-left-team').className = `team-box reds` + (leftIsOffense ? "" : " defending");
+                document.getElementById('header-right-team').className = `team-box blacks` + (rightIsOffense ? "" : " defending");
+            } else {
+                document.getElementById('header-left-team').className = `team-box blacks` + (leftIsOffense ? "" : " defending");
+                document.getElementById('header-right-team').className = `team-box reds` + (rightIsOffense ? "" : " defending");
+            }
+
+            let itEl = document.getElementById('inning-txt');
+            if (itEl) {
+                let inningStr = `${this.inning}回${this.isTop ? '表' : '裏'}`;
+                let leftSignal = leftIsOffense ? "【攻】" : "【守】";
+                let rightSignal = rightIsOffense ? "【攻】" : "【守】";
+                itEl.innerHTML = `<span style="font-size:11px; color:#FFFF00;">${leftSignal}</span>${inningStr}<span style="font-size:11px; color:#FFFF00;">${rightSignal}</span>`;
+            }
+            for (let i = 0; i < 3; i++) {
+                let dot = document.getElementById(`out-${i}`);
+                if (dot) dot.className = `out-ball ${i < this.outs ? 'active' : ''}`;
+            }
+            [0,1,2].forEach(i => {
+                let b = document.getElementById(`base-${i+1}`);
+                if (b) b.className = `base b-${i===0?'first':i===1?'second':'third'} ${this.bases[i]?'active':''}`;
+            });
+
+            this.applyTeamBoardsLayout();
+
+            this.renderCardUnit('pos-top-flag', this.isFlagOpened ? { rank: this.flagDeck.visitorVal, color: (this.gameMode === 'PVP' ? 'red' : 'black') } : null, !this.isFlagOpened, false);
+            this.renderCardUnit('pos-bottom-flag', this.isFlagOpened ? { rank: this.flagDeck.homeVal, color: (this.gameMode === 'PVP' ? 'black' : 'red') } : null, !this.isFlagOpened, false);
+
+            let lb = document.getElementById('pos-left-battle');
+            let rb = document.getElementById('pos-right-battle');
+            if (lb && rb) {
+                let isRevealed = (this.currentPhase === 'ROUTINE_3_RESULT' || this.currentPhase === 'ROUTINE_3_FOUL');
+                let visitorCard = this.battleCards.visitor;
+                let homeCard = this.battleCards.home;
+
+                if (this.gameMode === 'CPU') {
+                    let isPlayerLeft = (this.myTeam === 'BLACKS');
+
+                    if (visitorCard) {
+                        let showVisitor = isPlayerLeft || isRevealed;
+                        lb.className = `game-card ${showVisitor ? (visitorCard.color === 'black' ? 'card-black' : 'card-red') : 'card-hidden'} pos-left-battle`;
+                        lb.textContent = showVisitor ? visitorCard.rank : "";
+                    } else { lb.className = "game-card card-hidden pos-left-battle"; lb.textContent = ""; }
+
+                    if (homeCard) {
+                        let showHome = !isPlayerLeft || isRevealed;
+                        rb.className = `game-card ${showHome ? (homeCard.color === 'red' ? 'card-red' : 'card-black') : 'card-hidden'} pos-right-battle`;
+                        rb.textContent = showHome ? homeCard.rank : "";
+                    } else { rb.className = "game-card card-hidden pos-right-battle"; rb.textContent = ""; }
+                } else {
+                    let isVisitorMyTeam = (this.myTeam === 'REDS');
+                    if (visitorCard) {
+                        let showVisitor = isVisitorMyTeam || isRevealed;
+                        lb.className = `game-card ${showVisitor ? (visitorCard.color === 'red' ? 'card-red' : 'card-black') : 'card-hidden'} pos-left-battle`;
+                        lb.textContent = showVisitor ? visitorCard.rank : "";
+                    } else { lb.className = "game-card card-hidden pos-left-battle"; lb.textContent = ""; }
+
+                    if (homeCard) {
+                        let showHome = !isVisitorMyTeam || isRevealed;
+                        rb.className = `game-card ${showHome ? (homeCard.color === 'black' ? 'card-black' : 'card-red') : 'card-hidden'} pos-right-battle`;
+                        rb.textContent = showHome ? homeCard.rank : "";
+                    } else { rb.className = "game-card card-hidden pos-right-battle"; rb.textContent = ""; }
+                }
+            }
+            this.renderFoulHistory();
+            this.renderRightPanel();
+        }
+
+        renderCardUnit(id, card, isHidden) {
+            let el = document.getElementById(id);
+            if (!el) return;
+            if (isHidden || !card) {
+                el.className = `game-card card-hidden ${id}`;
+                el.textContent = "";
+            } else {
+                let colorClass = (card.color === 'black') ? 'card-black' : 'card-red';
+                el.className = `game-card ${colorClass} ${id}`;
+                el.textContent = card.rank;
+            }
+        }
+
+        renderFoulHistory() {
+            let c = document.getElementById('foul-grid-container');
+            if (!c) return;
+            let html = `<div class="foul-title-banner">ファール履歴</div>`;
+            for (let i = 0; i < 14; i++) {
+                let p = Math.floor(i / 2), b = (i % 2 === 0), pr = this.foulPairs[p];
+                let cardColorCls = pr ? (b ? (pr.visitorColor === 'black' ? 'card-black' : 'card-red') : (pr.homeColor === 'black' ? 'card-black' : 'card-red')) : 'card-black';
+                html += pr ? `<div class="game-card ${cardColorCls}" style="width:100%;height:100%;font-size:11px;">${b ? pr.visitor : pr.home}</div>` : `<div class="foul-slot">${i+1}</div>`;
+            }
+            c.innerHTML = html;
+        }
+
+        renderRightPanel() {
+            let p = document.getElementById('hand-grid');
+            if (!p) return;
+
+            let currentHand = this.handsData[this.myTeam];
+            let teamLabel = `強 A ≫ K ≫ Q ≫ J（Aキラー）`;
+
+            let html = `<div class="effect-guide">${teamLabel}</div><div class="hand-cards-grid">`;
+            currentHand.forEach((cd, idx) => {
+                if (cd.used && this.selectedCardIndex !== idx) {
+                    html += `<div class="card-empty-slot"></div>`;
+                } else {
+                    let cardCls = (cd.color === 'black') ? 'card-black' : 'card-red';
+                    let isSelected = (this.selectedCardIndex === idx);
+                    let extraStyle = isSelected ? 'border: 2px solid #FFD700; transform: translateY(-2px);' : '';
+                    html += `<div class="game-card ${cardCls}" style="${extraStyle}" onclick="gameLoop.selectCard(${idx})">${cd.rank}</div>`;
+                }
+            });
+            html += `</div>`;
+
+            if (this.gameMode === 'CPU') {
+                if (!this.isTeamLocked) {
+                    html += `<div class="team-logo-changer" onclick="gameLoop.toggleTeamChangeMode()">REDS ⇄ BLACKS (チェンジャー)</div>`;
+                } else {
+                    html += `<div class="team-logo-changer locked">操作チーム固定：${this.myTeam}</div>`;
+                }
+            }
+            p.innerHTML = html;
+        }
+
+        toggleTeamChangeMode() {
+            if (this.isTeamLocked) return;
+            snd.seSelect();
+            this.myTeam = (this.myTeam === 'BLACKS') ? 'REDS' : 'BLACKS';
+            this.renderAll();
+        }
+    }
+
+    const appManager = new GameLoopManager();
+    const gameLoop = appManager;
+    </script>
+</body>
+</html>
