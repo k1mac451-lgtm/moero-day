@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>燃えろ!デーゲーム</title>
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js" defer></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -237,7 +238,7 @@
     <div id="lobby-screen">
         <div class="lobby-box">
             <div class="lobby-title">― Black Dome Lobby ―</div>
-            <div class="lobby-sub">通信エキシビション：ナイターマッチ</div>
+            <div class="lobby-sub">通信エキシビション：ナイターマッチ<br><span style="font-size:9.5px;color:#00E5FF;">Server: four51k1-peer-server.onrender.com</span></div>
             <div style="display: flex; gap: 8px; margin-bottom: 8px;">
                 <button id="host-team-blacks" class="lobby-btn" style="background:#111; color:#FFD700; border:2px solid #FFD700;" onclick="appManager.selectHostTeam('BLACKS')">BLACKS (HOME)</button>
                 <button id="host-team-reds" class="lobby-btn" style="background:#444; color:#aaa; border:2px solid #444;" onclick="appManager.selectHostTeam('REDS')">REDS (Visitor)</button>
@@ -399,7 +400,6 @@
                 this.playNoise(0.15, 0.22);
             } catch(e) {}
         }
-        // 「でれでれんでれん、でれでれんでれん！」風の打席入り軽快フレーズ
         seThemeJingle() {
             this.init();
             const phrase = [
@@ -500,73 +500,252 @@
 
     class NetworkManager {
         constructor() {
+            this.serverHost = 'four51k1-peer-server.onrender.com'; //
+            this.serverUrl = `https://${this.serverHost}`; //
             this.channel = null;
+            this.peer = null;
+            this.conn = null;
             this.roomId = null;
             this.role = null;
             this.myTeam = null;
             this.onDataCallback = null;
             this.pingTimer = null;
+            this.retryTimer = null;
+            this.retryCount = 0;
+            this.maxRetries = 6;
+            this.manualClose = false;
             this.lastPingTime = 0;
             this.lastProcessedMsgId = null;
             this.isConnected = false;
+            this.serverAwake = false;
         }
+
+        // Render Freeプランのスリープ復帰待ち（ウェイクアップ確認）
+        async wakeUpServer(onProgress) {
+            this.serverAwake = false;
+            const maxAttempts = 8;
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                if (this.manualClose) return false;
+                if (typeof onProgress === 'function') {
+                    onProgress(`サーバー起動確認中 (${attempt}/${maxAttempts})... スリープ復帰に数秒かかる場合があります`);
+                }
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 6000);
+                try {
+                    const res = await fetch(`${this.serverUrl}/`, {
+                        method: 'GET',
+                        mode: 'cors',
+                        cache: 'no-store',
+                        signal: controller.signal
+                    });
+                    clearTimeout(timeoutId);
+                    if (res.ok || res.status === 404 || res.status === 426) {
+                        this.serverAwake = true;
+                        return true;
+                    }
+                } catch (e) {
+                    clearTimeout(timeoutId);
+                }
+                await new Promise(resolve => setTimeout(resolve, 2500));
+            }
+            return false;
+        }
+
         init(roomId, role, myTeam, callback) {
+            this.manualClose = false;
             this.roomId = roomId;
             this.role = role;
             this.myTeam = myTeam;
             this.onDataCallback = callback;
             this.isConnected = false;
+            this.retryCount = 0;
             this.lastProcessedMsgId = null;
+            if (this.retryTimer) {
+                clearTimeout(this.retryTimer);
+                this.retryTimer = null;
+            }
 
+            // 同一端末・別タブ同期用チャネル
             if (window.BroadcastChannel) {
                 if (this.channel) this.channel.close();
                 this.channel = new BroadcastChannel('black_dome_room_' + roomId);
                 this.channel.onmessage = (event) => {
                     if (!event.data || event.data.senderRole === this.role) return;
-                    if (event.data.msgId && event.data.msgId === this.lastProcessedMsgId) return;
-                    this.lastProcessedMsgId = event.data.msgId || null;
-                    this.isConnected = true;
-
-                    if (event.data.type === 'PING') {
-                        this.send({ type: 'PONG', timestamp: event.data.timestamp });
-                        return;
-                    }
-                    if (event.data.type === 'PONG') {
-                        let latency = Math.max(1, Date.now() - event.data.timestamp);
-                        appManager.updateNetworkSignalUI(true, latency);
-                        return;
-                    }
-                    if (typeof this.onDataCallback === 'function') {
-                        this.onDataCallback(event.data);
-                    }
+                    this.receiveIncomingMessage(event.data);
                 };
             }
 
+            // PeerJS接続の開始
+            this.connectPeer();
+
+            // 定期Ping / ローカル同期ポーリング
             if (this.pingTimer) clearInterval(this.pingTimer);
             this.pingTimer = setInterval(() => {
-                if (!this.roomId) return;
+                if (!this.roomId || this.manualClose) return;
                 this.lastPingTime = Date.now();
                 this.send({ type: 'PING', timestamp: this.lastPingTime });
                 try {
                     let saved = localStorage.getItem('bd_net_' + this.roomId);
                     if (saved) {
                         let parsed = JSON.parse(saved);
-                        if (parsed.senderRole !== this.role && parsed.timestamp && (Date.now() - parsed.timestamp < 3000)) {
+                        if (parsed.senderRole !== this.role && parsed.timestamp && (Date.now() - parsed.timestamp < 4000)) {
                             this.isConnected = true;
                             if (parsed.type === 'PONG' && parsed.timestamp) {
                                 appManager.updateNetworkSignalUI(true, Math.max(1, Date.now() - parsed.timestamp));
                             }
-                            if (typeof this.onDataCallback === 'function' && parsed.type !== 'PING' && parsed.type !== 'PONG') {
-                                if (parsed.msgId && parsed.msgId !== this.lastProcessedMsgId) {
-                                    this.lastProcessedMsgId = parsed.msgId;
-                                    this.onDataCallback(parsed);
-                                }
+                            if (parsed.type !== 'PING' && parsed.type !== 'PONG') {
+                                this.receiveIncomingMessage(parsed);
                             }
                         }
                     }
                 } catch(e) {}
             }, 1500);
         }
+
+        connectPeer() {
+            if (this.manualClose || !this.roomId) return;
+            if (typeof window.Peer !== 'function') return;
+
+            if (this.peer && !this.peer.destroyed) {
+                try { this.peer.destroy(); } catch(e) {}
+            }
+
+            const peerId = (this.role === 'HOST')
+                ? `${this.roomId}-host`
+                : `${this.roomId}-guest-${Math.random().toString(36).substring(2, 6)}`;
+
+            const peerConfig = {
+                host: this.serverHost,
+                port: 443,
+                path: '/',
+                secure: true,
+                config: {
+                    iceServers: [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:stun1.l.google.com:19302' }
+                    ]
+                }
+            };
+
+            try {
+                this.peer = new window.Peer(peerId, peerConfig);
+
+                this.peer.on('open', () => {
+                    this.retryCount = 0;
+                    this.serverAwake = true;
+                    appManager.updateNetworkSignalUI(this.isConnected, 25);
+                    if (this.role === 'GUEST') {
+                        this.connectToHostPeer();
+                    }
+                });
+
+                this.peer.on('connection', (incomingConn) => {
+                    this.bindDataConnection(incomingConn);
+                });
+
+                this.peer.on('disconnected', () => {
+                    if (!this.manualClose) {
+                        this.scheduleReconnect('Peerサーバーから切断されました。再接続します...');
+                    }
+                });
+
+                this.peer.on('error', (err) => {
+                    if (this.manualClose) return;
+                    if (err && (err.type === 'network' || err.type === 'server-error' || err.type === 'socket-error' || err.type === 'peer-unavailable')) {
+                        this.scheduleReconnect(`接続再試行中 (${this.retryCount + 1}/${this.maxRetries})...`);
+                    }
+                });
+            } catch(e) {
+                this.scheduleReconnect('Peer初期化リトライ中...');
+            }
+        }
+
+        connectToHostPeer() {
+            if (!this.peer || this.peer.destroyed || this.manualClose) return;
+            const hostPeerId = `${this.roomId}-host`;
+            try {
+                const conn = this.peer.connect(hostPeerId, { reliable: true });
+                this.bindDataConnection(conn);
+            } catch(e) {
+                this.scheduleReconnect('ホストへの再接続を待機中...');
+            }
+        }
+
+        bindDataConnection(conn) {
+            if (!conn) return;
+            this.conn = conn;
+            conn.on('open', () => {
+                this.isConnected = true;
+                this.retryCount = 0;
+                appManager.updateNetworkSignalUI(true, 18);
+                if (this.role === 'GUEST') {
+                    this.send({ type: 'JOIN', team: this.myTeam });
+                }
+            });
+            conn.on('data', (data) => {
+                if (!data || data.senderRole === this.role) return;
+                this.receiveIncomingMessage(data);
+            });
+            conn.on('close', () => {
+                if (!this.manualClose) {
+                    this.scheduleReconnect('通信経路が閉じたため再接続を試行します...');
+                }
+            });
+            conn.on('error', () => {
+                if (!this.manualClose) {
+                    this.scheduleReconnect('通信エラー発生。再接続をリトライします...');
+                }
+            });
+        }
+
+        scheduleReconnect(statusText) {
+            if (this.manualClose || this.retryTimer) return;
+            if (this.retryCount >= this.maxRetries) {
+                appManager.setLobbyStatus(`⚠️ 再接続上限に達しました。「通信診断・リセット」または「通信シングル」をお試しください。`);
+                return;
+            }
+            this.retryCount++;
+            const delayMs = Math.min(8000, 1200 * this.retryCount);
+            appManager.updateNetworkSignalUI(false, 0);
+            if (statusText) {
+                appManager.setLobbyStatus(`🔄 ${statusText}`);
+            }
+
+            this.retryTimer = setTimeout(async () => {
+                this.retryTimer = null;
+                if (this.manualClose) return;
+                await this.wakeUpServer((msg) => appManager.setLobbyStatus(`⏳ ${msg}`));
+                if (this.manualClose) return;
+                if (!this.peer || this.peer.destroyed) {
+                    this.connectPeer();
+                } else if (this.peer.disconnected) {
+                    try { this.peer.reconnect(); } catch(e) { this.connectPeer(); }
+                } else if (this.role === 'GUEST') {
+                    this.connectToHostPeer();
+                }
+            }, delayMs);
+        }
+
+        receiveIncomingMessage(data) {
+            if (!data) return;
+            if (data.msgId && data.msgId === this.lastProcessedMsgId) return;
+            this.lastProcessedMsgId = data.msgId || null;
+            this.isConnected = true;
+
+            if (data.type === 'PING') {
+                this.send({ type: 'PONG', timestamp: data.timestamp });
+                return;
+            }
+            if (data.type === 'PONG') {
+                let latency = Math.max(1, Date.now() - data.timestamp);
+                appManager.updateNetworkSignalUI(true, latency);
+                return;
+            }
+            if (typeof this.onDataCallback === 'function') {
+                this.onDataCallback(data);
+            }
+        }
+
         send(data) {
             if (!this.roomId) return;
             const payload = Object.assign({}, data, {
@@ -574,6 +753,10 @@
                 timestamp: Date.now(),
                 msgId: Math.random().toString(36).substring(2, 10)
             });
+
+            if (this.conn && this.conn.open) {
+                try { this.conn.send(payload); } catch(e) {}
+            }
             if (this.channel) {
                 try { this.channel.postMessage(payload); } catch(e) {}
             }
@@ -581,9 +764,23 @@
                 localStorage.setItem('bd_net_' + this.roomId, JSON.stringify(payload));
             } catch(e) {}
         }
+
         close() {
+            this.manualClose = true;
             if (this.pingTimer) { clearInterval(this.pingTimer); this.pingTimer = null; }
-            if (this.channel) { this.channel.close(); this.channel = null; }
+            if (this.retryTimer) { clearTimeout(this.retryTimer); this.retryTimer = null; }
+            if (this.conn) {
+                try { this.conn.close(); } catch(e) {}
+                this.conn = null;
+            }
+            if (this.peer && !this.peer.destroyed) {
+                try { this.peer.destroy(); } catch(e) {}
+                this.peer = null;
+            }
+            if (this.channel) {
+                try { this.channel.close(); } catch(e) {}
+                this.channel = null;
+            }
             this.isConnected = false;
         }
     }
@@ -657,6 +854,11 @@
             this.scoreTimers = [];
             this.joinPollTimer = null;
             this.stats = { hits: { visitor: 0, home: 0 }, errors: { visitor: 0, home: 0 }, homeRuns: { visitor: 0, home: 0 } };
+        }
+
+        setLobbyStatus(msg) {
+            const el = document.getElementById('lobby-status-msg');
+            if (el) el.textContent = msg;
         }
 
         clearScoreTimers() {
@@ -757,12 +959,12 @@
             if (!sigBox) return;
             sigBox.style.display = 'block';
             if (isConnected) {
-                sigStatus.textContent = "Connected (Online)";
+                sigStatus.textContent = "Connected (four51k1)"; //
                 sigStatus.style.color = "#00FF00";
                 sigHandshake.innerHTML = `<span class="signal-dot active"></span>Synced & Ready`;
                 sigPing.textContent = `${latency} ms`;
             } else {
-                sigStatus.textContent = "Searching...";
+                sigStatus.textContent = this.net.retryCount > 0 ? `Reconnecting (${this.net.retryCount}/${this.net.maxRetries})` : "Waking / Standby";
                 sigStatus.style.color = "#FF9900";
                 sigHandshake.innerHTML = `<span class="signal-dot"></span>Waiting for Peer`;
                 sigPing.textContent = "--- ms";
@@ -774,11 +976,11 @@
             this.clearJoinPoll();
             this.net.close();
             document.getElementById('room-id-input').value = "";
-            document.getElementById('lobby-status-msg').textContent = "通信診断完了。再度ルーム作成・参加またはシングルをお試しください。";
-            alert("【通信診断ツール】\n1. ルーム接続とポーリングをリセットしました。\n2. 同期キャッシュの競合状態をクリアしました。");
+            this.setLobbyStatus("通信診断完了。four51k1-peer-server.onrender.com 接続をリセットしました。"); //
+            alert("【通信診断ツール】\n1. 接続先: four51k1-peer-server.onrender.com\n2. ルーム接続・再接続タイマー・同期キャッシュをリセットしました。"); //
         }
 
-        createRoom() {
+        async createRoom() {
             snd.seSelect();
             this.clearJoinPoll();
             let roomId = "BD-" + Math.floor(1000 + Math.random() * 9000);
@@ -788,11 +990,20 @@
             this.netRole = 'HOST';
             this.pvpSubMode = 'ONLINE';
             this.myTeam = this.hostTeamChoice;
-            this.net.init(roomId, 'HOST', this.myTeam, (data) => this.handleNetworkData(data));
-            document.getElementById('lobby-status-msg').textContent = `📡 ルーム作成完了 [ID: ${roomId}]。ゲスト待機中...`;
             this.updateNetworkSignalUI(false, 0);
 
+            await this.net.wakeUpServer((msg) => this.setLobbyStatus(`⏳ ${msg}`));
+            this.net.init(roomId, 'HOST', this.myTeam, (data) => this.handleNetworkData(data));
+            this.setLobbyStatus(`📡 ルーム作成完了 [ID: ${roomId}]。ゲスト待機中...`);
+
             this.joinPollTimer = setInterval(() => {
+                if (this.net.isConnected) {
+                    this.clearJoinPoll();
+                    this.updateNetworkSignalUI(true, 15);
+                    this.setLobbyStatus(`🔗 ゲスト合流成功！プレイボール！`);
+                    setTimeout(() => this.startPvpGame('ONLINE'), 800);
+                    return;
+                }
                 let saved = localStorage.getItem('bd_net_' + roomId);
                 if (saved) {
                     try {
@@ -800,7 +1011,7 @@
                         if (parsed.senderRole === 'GUEST' && parsed.type === 'JOIN') {
                             this.clearJoinPoll();
                             this.updateNetworkSignalUI(true, 15);
-                            document.getElementById('lobby-status-msg').textContent = `🔗 ゲスト合流成功！プレイボール！`;
+                            this.setLobbyStatus(`🔗 ゲスト合流成功！プレイボール！`);
                             setTimeout(() => this.startPvpGame('ONLINE'), 800);
                         }
                     } catch(e) {}
@@ -808,7 +1019,7 @@
             }, 800);
         }
 
-        joinRoom() {
+        async joinRoom() {
             snd.seSelect();
             this.clearJoinPoll();
             let id = prompt("ホストから教わったID（例: BD-1234）を入力してください:");
@@ -819,11 +1030,13 @@
                 this.pvpSubMode = 'ONLINE';
                 this.myTeam = (this.hostTeamChoice === 'REDS') ? 'BLACKS' : 'REDS';
 
-                document.getElementById('lobby-status-msg').textContent = `🔗 ホスト [ID: ${id}] へ接続中...`;
+                this.updateNetworkSignalUI(false, 0);
+                await this.net.wakeUpServer((msg) => this.setLobbyStatus(`⏳ ${msg}`));
+                this.setLobbyStatus(`🔗 ホスト [ID: ${id}] へ接続中...`);
                 this.net.init(id, 'GUEST', this.myTeam, (data) => this.handleNetworkData(data));
                 this.net.send({ type: 'JOIN', team: this.myTeam });
                 this.updateNetworkSignalUI(true, 22);
-                document.getElementById('lobby-status-msg').textContent = `🔗 接続成功！ゲームへ入場します...`;
+                this.setLobbyStatus(`🔗 接続成功！ゲームへ入場します...`);
                 setTimeout(() => this.startPvpGame('ONLINE'), 900);
             }
         }
@@ -1201,7 +1414,6 @@
             }
         }
 
-        // J/Q/K/Aの力関係・残手札・状況を考慮したCPU思考ロジック
         doesCardBeat(attackerRank, defenderRank) {
             if (attackerRank === defenderRank) return false;
             if (attackerRank === 'J' && defenderRank === 'A') return true;
@@ -1218,7 +1430,6 @@
             const isBadFlag = this.currentCase.rawCaseNum === "CASE④";
             const effCase = this.currentCase.effectiveCaseNum;
 
-            // 相手側の残り手札分布を推定（初期は各2枚ずつ、同チーム手札の消費度合いから推測）
             const ranks = ['A', 'K', 'Q', 'J'];
             const oppProb = {};
             const totalUnused = unusedCards.length;
@@ -1227,7 +1438,6 @@
                 oppProb[r] = Math.max(0.05, (ownCount + 0.5) / (totalUnused + 2));
             });
 
-            // 重複カードがある場合は、1枚は温存できるように少しだけ割引
             const countByRank = {};
             unusedCards.forEach(c => { countByRank[c.rank] = (countByRank[c.rank] || 0) + 1; });
 
@@ -1244,38 +1454,30 @@
                 });
                 let loseProb = Math.max(0, 1 - winProb - foulProb);
 
-                // カード自体の希少価値（温存度）
                 let rarityBonus = 0;
                 if (card.rank === 'A') rarityBonus = countByRank['A'] >= 2 ? 0.6 : 1.3;
                 else if (card.rank === 'J') rarityBonus = countByRank['J'] >= 2 ? 0.4 : 0.9;
                 else if (card.rank === 'K') rarityBonus = 0.3;
                 else rarityBonus = 0.0;
 
-                // 状況に応じた期待値評価
                 let expectedUtility = 0;
                 if (isCpuOffense) {
                     if (isBadFlag) {
-                        // バッドフラグ：カードに負けると打てる／勝つと1アウトになりやすい
                         expectedUtility = loseProb * 2.2 - winProb * 2.5 - foulProb * 0.4;
                     } else if (effCase === "CASE⑨") {
                         expectedUtility = winProb * 4.5 - loseProb * 1.5 - foulProb * 0.3;
                     } else if (effCase === "CASE⑧" || effCase === "CASE⑦") {
                         expectedUtility = winProb * 3.0 - loseProb * 2.6 - foulProb * 0.3;
                     } else if (effCase === "CASE⑥" && hasRunner) {
-                        // 犠打ケース：走者ありなら進塁/生還を狙いつつも無駄な強カード消費を抑える
                         expectedUtility = winProb * 1.8 - loseProb * 1.4 - foulProb * 0.2;
                     } else {
                         expectedUtility = winProb * 2.4 - loseProb * 1.6 - foulProb * 0.3;
                     }
-                    // 2アウト時は勝負に出る
                     if (this.outs >= 2 && !isBadFlag) expectedUtility += winProb * 1.0;
                 } else {
-                    // 守備側（ピッチャー）
                     if (isBadFlag) {
-                        // バッドフラグ：守備側がカードに勝つと打たれる／負けると抑えやすい
                         expectedUtility = loseProb * 2.4 - winProb * 2.6 - foulProb * 0.3;
                     } else if (effCase === "CASE⑨" || effCase === "CASE⑧" || effCase === "CASE⑦") {
-                        // 長打・大量失点リスクが高いケースは勝負球を惜しまない
                         expectedUtility = winProb * 3.4 - loseProb * 2.8 - foulProb * 0.2;
                     } else {
                         expectedUtility = winProb * 2.3 - loseProb * 1.7 - foulProb * 0.2;
@@ -1283,7 +1485,6 @@
                     if (this.outs >= 2) expectedUtility += winProb * 0.8;
                 }
 
-                // 温存ペナルティ（終盤やピンチ・チャンス以外は温存を少し優先）
                 const lateGameFactor = (this.inning >= 3) ? 0.35 : 0.85;
                 const score = expectedUtility - (rarityBonus * lateGameFactor) + (Math.random() * 0.35);
 
@@ -1371,28 +1572,23 @@
                 return;
             }
 
-            // JはAに勝つ、それ以外はA > K > Q > J
             let visitorWinsCard = this.doesCardBeat(visitorCard.rank, homeCard.rank);
             let cardWinnerRole = visitorWinsCard ? 'visitor' : 'home';
             let isOffenseCardWinner = (cardWinnerRole === offenseRole);
             const hasRunner = this.bases.some(Boolean);
             const rawCase = this.currentCase.rawCaseNum;
 
-            // ランナーなし時の代替判定（CASE⑤ / CASE⑥ / CASE⑦ は走者なしなら CASE① 代替）
             let effectiveCase = rawCase;
             if (!hasRunner && (rawCase === "CASE⑤" || rawCase === "CASE⑥" || rawCase === "CASE⑦")) {
                 effectiveCase = "CASE①";
             }
 
-            // 実際のアクション決定
             let actionType = 'OUT_1';
             let isHit = false;
             let isHomerun = false;
             let isError = false;
 
             if (rawCase === "CASE④") {
-                // バッドフラグ：勝者が不利になり、敗者が回避できた（反比例）
-                // 攻撃側が勝ったのに1アウト／守備側が勝ったのに打たれる（シングルまたはランナー進塁）
                 if (isOffenseCardWinner) {
                     actionType = 'BAD_FLAG_OFFENSE_WIN_OUT';
                     isHit = false;
@@ -1402,7 +1598,6 @@
                     isError = true;
                 }
             } else if (effectiveCase === "CASE⑤") {
-                // ランナーイベント（走者あり限定）：バッター自身の進塁なし、走者進塁 or 走者アウト
                 if (isOffenseCardWinner) {
                     actionType = 'RUNNER_ADVANCE_ONLY';
                     isHit = false;
@@ -1411,7 +1606,6 @@
                     isHit = false;
                 }
             } else if (effectiveCase === "CASE⑥") {
-                // 犠打（走者あり限定）：攻撃成功でもバッターはアウト（犠牲）でランナー進塁・生還
                 if (isOffenseCardWinner) {
                     actionType = 'SACRIFICE_BUNT_ADVANCE';
                     isHit = false;
@@ -1420,7 +1614,6 @@
                     isHit = false;
                 }
             } else if (effectiveCase === "CASE⑦") {
-                // 2Bヒット or ダブルプレー（ランナーあり条件）
                 if (isOffenseCardWinner) {
                     actionType = 'HIT_2B';
                     isHit = true;
@@ -1462,7 +1655,6 @@
                     isHit = false;
                 }
             } else {
-                // CASE①（および走者なし時の代替）
                 if (isOffenseCardWinner) {
                     actionType = 'HIT_1B';
                     isHit = true;
@@ -1588,7 +1780,6 @@
             this.renderAll();
         }
 
-        // サヨナラ勝ち判定（最終回裏にホームが勝ち越した瞬間）
         checkWalkoffWin() {
             if (this.gameEnded) return false;
             if (this.inning >= 3 && !this.isTop && this.scores.home > this.scores.visitor) {
@@ -1603,7 +1794,6 @@
             return false;
         }
 
-        // 裏の攻撃まで終わった時点での10点差コールド判定
         checkColdGameAtHalfOrFullEnd() {
             if (this.gameEnded) return false;
             if (!this.isTop) {
@@ -1662,7 +1852,6 @@
                 return;
             }
             if (this.outs >= 3) {
-                // 裏の攻撃終了時点の10点差コールド判定
                 if (this.checkColdGameAtHalfOrFullEnd()) {
                     return;
                 }
@@ -1810,7 +1999,6 @@
             else if (d === 8) rawCase = "CASE⑧";
             else rawCase = "CASE⑨";
 
-            // 走者なし時の代替（CASE⑤/⑥/⑦は走者なしならCASE①）
             let effectiveCase = (!hasRunner && (rawCase === "CASE⑤" || rawCase === "CASE⑥" || rawCase === "CASE⑦"))
                 ? "CASE①"
                 : rawCase;
