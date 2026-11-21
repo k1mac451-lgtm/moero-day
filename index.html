@@ -399,10 +399,24 @@
                 this.playNoise(0.15, 0.22);
             } catch(e) {}
         }
+        // 「でれでれんでれん、でれでれんでれん！」風の打席入り軽快フレーズ
         seThemeJingle() {
             this.init();
-            let notes = [523.25, 659.25, 783.99, 1046.50, 1318.51];
-            notes.forEach((f, idx) => setTimeout(() => this.playTone(f, 0.1, 'triangle', 0.22), idx * 80));
+            const phrase = [
+                { f: 587.33, d: 0.065, t: 0 },
+                { f: 659.25, d: 0.065, t: 65 },
+                { f: 783.99, d: 0.065, t: 130 },
+                { f: 987.77, d: 0.075, t: 195 },
+                { f: 880.00, d: 0.11,  t: 270 },
+                { f: 587.33, d: 0.065, t: 430 },
+                { f: 659.25, d: 0.065, t: 495 },
+                { f: 783.99, d: 0.065, t: 560 },
+                { f: 1046.50,d: 0.075, t: 625 },
+                { f: 1174.66,d: 0.18,  t: 700 }
+            ];
+            phrase.forEach(n => {
+                setTimeout(() => this.playTone(n.f, n.d, 'square', 0.18), n.t);
+            });
         }
         playGameStartHitAndCheers() {
             this.init();
@@ -590,7 +604,7 @@
             this.selectedCardIndex = null;
             this.flagDeck = { visitorVal: 2, homeVal: 2 };
             this.isFlagOpened = false;
-            this.currentCase = { caseNum: "CASE⑨", description: "ホームラン or アウト" };
+            this.currentCase = { caseNum: "CASE⑨", description: "ホームラン or アウト", rawCaseNum: "CASE⑨", effectiveCaseNum: "CASE⑨", isBadFlag: false };
             this.battleCards = { visitor: null, home: null };
 
             this.playerFlagReady = false;
@@ -628,7 +642,14 @@
                 ]
             };
 
-            this.lastBattleSuccess = null;
+            this.lastBattleOutcome = {
+                cardWinnerRole: 'visitor',
+                isOffenseCardWinner: false,
+                actionType: 'OUT_1',
+                isHit: false,
+                isHomerun: false,
+                isError: false
+            };
             this.turnTimer = null;
             this.timeLeft = 30;
             this.justStartedPlayBall = false;
@@ -884,7 +905,7 @@
                 this.flagDeck = data.flagDeck || this.flagDeck;
                 this.currentCase = data.currentCase || this.currentCase;
                 this.battleCards = data.battleCards || this.battleCards;
-                this.lastBattleSuccess = !!data.success;
+                this.lastBattleOutcome = data.outcome || this.lastBattleOutcome;
                 this.isFoul = !!data.isFoul;
                 if (data.isFoul) {
                     this.pendingFoulPair = data.foulPair || null;
@@ -1051,7 +1072,7 @@
             this.flagDeck.homeVal = flagValues[Math.floor(Math.random() * flagValues.length)];
             this.currentCase = this.evaluateCase(this.flagDeck.visitorVal, this.flagDeck.homeVal);
 
-            this.updateBoardAndCommentary("さぁ、この打席の行方を左右する緊迫の瞬間！スタンドからも大歓声が送られます！");
+            this.updateBoardAndCommentary("でれでれんでれん！さぁ打席へ！このケースの読み合いが始まる！");
             if (this.gameMode === 'PVP') this.startTurnTimer();
             this.renderAll();
         }
@@ -1147,7 +1168,7 @@
                         oppPool.forEach(c => c.used = false);
                         unusedOpp = oppPool;
                     }
-                    let aiCard = unusedOpp[Math.floor(Math.random() * unusedOpp.length)];
+                    let aiCard = this.chooseSmartCpuCard(unusedOpp, aiTeam);
                     aiCard.used = true;
                     let aiBattleCard = { id: aiCard.id, rank: aiCard.rank, color: aiCard.color, used: true };
                     if (aiTeam === 'REDS') this.battleCards.visitor = aiBattleCard;
@@ -1180,6 +1201,101 @@
             }
         }
 
+        // J/Q/K/Aの力関係・残手札・状況を考慮したCPU思考ロジック
+        doesCardBeat(attackerRank, defenderRank) {
+            if (attackerRank === defenderRank) return false;
+            if (attackerRank === 'J' && defenderRank === 'A') return true;
+            if (attackerRank === 'A' && defenderRank === 'J') return false;
+            return this.getRankVal(attackerRank) > this.getRankVal(defenderRank);
+        }
+
+        chooseSmartCpuCard(unusedCards, cpuTeam) {
+            if (!unusedCards || unusedCards.length === 0) return null;
+            if (unusedCards.length === 1) return unusedCards[0];
+
+            const isCpuOffense = (cpuTeam === 'BLACKS' && this.isTop) || (cpuTeam === 'REDS' && !this.isTop);
+            const hasRunner = this.bases.some(Boolean);
+            const isBadFlag = this.currentCase.rawCaseNum === "CASE④";
+            const effCase = this.currentCase.effectiveCaseNum;
+
+            // 相手側の残り手札分布を推定（初期は各2枚ずつ、同チーム手札の消費度合いから推測）
+            const ranks = ['A', 'K', 'Q', 'J'];
+            const oppProb = {};
+            const totalUnused = unusedCards.length;
+            ranks.forEach(r => {
+                const ownCount = unusedCards.filter(c => c.rank === r).length;
+                oppProb[r] = Math.max(0.05, (ownCount + 0.5) / (totalUnused + 2));
+            });
+
+            // 重複カードがある場合は、1枚は温存できるように少しだけ割引
+            const countByRank = {};
+            unusedCards.forEach(c => { countByRank[c.rank] = (countByRank[c.rank] || 0) + 1; });
+
+            let bestCard = unusedCards[0];
+            let bestScore = -Infinity;
+
+            unusedCards.forEach(card => {
+                let winProb = 0;
+                let foulProb = oppProb[card.rank] || 0.25;
+                ranks.forEach(oppR => {
+                    if (oppR !== card.rank && this.doesCardBeat(card.rank, oppR)) {
+                        winProb += (oppProb[oppR] || 0.25);
+                    }
+                });
+                let loseProb = Math.max(0, 1 - winProb - foulProb);
+
+                // カード自体の希少価値（温存度）
+                let rarityBonus = 0;
+                if (card.rank === 'A') rarityBonus = countByRank['A'] >= 2 ? 0.6 : 1.3;
+                else if (card.rank === 'J') rarityBonus = countByRank['J'] >= 2 ? 0.4 : 0.9;
+                else if (card.rank === 'K') rarityBonus = 0.3;
+                else rarityBonus = 0.0;
+
+                // 状況に応じた期待値評価
+                let expectedUtility = 0;
+                if (isCpuOffense) {
+                    if (isBadFlag) {
+                        // バッドフラグ：カードに負けると打てる／勝つと1アウトになりやすい
+                        expectedUtility = loseProb * 2.2 - winProb * 2.5 - foulProb * 0.4;
+                    } else if (effCase === "CASE⑨") {
+                        expectedUtility = winProb * 4.5 - loseProb * 1.5 - foulProb * 0.3;
+                    } else if (effCase === "CASE⑧" || effCase === "CASE⑦") {
+                        expectedUtility = winProb * 3.0 - loseProb * 2.6 - foulProb * 0.3;
+                    } else if (effCase === "CASE⑥" && hasRunner) {
+                        // 犠打ケース：走者ありなら進塁/生還を狙いつつも無駄な強カード消費を抑える
+                        expectedUtility = winProb * 1.8 - loseProb * 1.4 - foulProb * 0.2;
+                    } else {
+                        expectedUtility = winProb * 2.4 - loseProb * 1.6 - foulProb * 0.3;
+                    }
+                    // 2アウト時は勝負に出る
+                    if (this.outs >= 2 && !isBadFlag) expectedUtility += winProb * 1.0;
+                } else {
+                    // 守備側（ピッチャー）
+                    if (isBadFlag) {
+                        // バッドフラグ：守備側がカードに勝つと打たれる／負けると抑えやすい
+                        expectedUtility = loseProb * 2.4 - winProb * 2.6 - foulProb * 0.3;
+                    } else if (effCase === "CASE⑨" || effCase === "CASE⑧" || effCase === "CASE⑦") {
+                        // 長打・大量失点リスクが高いケースは勝負球を惜しまない
+                        expectedUtility = winProb * 3.4 - loseProb * 2.8 - foulProb * 0.2;
+                    } else {
+                        expectedUtility = winProb * 2.3 - loseProb * 1.7 - foulProb * 0.2;
+                    }
+                    if (this.outs >= 2) expectedUtility += winProb * 0.8;
+                }
+
+                // 温存ペナルティ（終盤やピンチ・チャンス以外は温存を少し優先）
+                const lateGameFactor = (this.inning >= 3) ? 0.35 : 0.85;
+                const score = expectedUtility - (rarityBonus * lateGameFactor) + (Math.random() * 0.35);
+
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestCard = card;
+                }
+            });
+
+            return bestCard;
+        }
+
         executePhase3_Battle() {
             if (this.gameMode !== 'PVP') {
                 let cpuTeam = (this.myTeam === 'BLACKS') ? 'REDS' : 'BLACKS';
@@ -1189,7 +1305,7 @@
                     cpuPool.forEach(c => c.used = false);
                     unusedCpu = cpuPool;
                 }
-                let cpuCard = unusedCpu[Math.floor(Math.random() * unusedCpu.length)];
+                let cpuCard = this.chooseSmartCpuCard(unusedCpu, cpuTeam);
                 cpuCard.used = true;
                 let cpuBattleCard = { id: cpuCard.id, rank: cpuCard.rank, color: cpuCard.color, used: true };
                 if (cpuTeam === 'BLACKS') this.battleCards.visitor = cpuBattleCard;
@@ -1233,13 +1349,7 @@
             let visitorCard = this.battleCards.visitor || { rank: 'K', color: 'black' };
             let homeCard = this.battleCards.home || { rank: 'K', color: 'red' };
 
-            let visitorWin = (visitorCard.rank === 'J' && homeCard.rank === 'A')
-                ? true
-                : (homeCard.rank === 'J' && visitorCard.rank === 'A')
-                    ? false
-                    : this.getRankVal(visitorCard.rank) >= this.getRankVal(homeCard.rank);
             let isFoul = (visitorCard.rank === homeCard.rank);
-
             if (isFoul) {
                 this.pendingFoulPair = {
                     visitor: visitorCard.rank,
@@ -1261,13 +1371,120 @@
                 return;
             }
 
-            let winningRole = visitorWin ? 'visitor' : 'home';
-            let finalOffenseSuccess = (winningRole === offenseRole);
-            if (this.currentCase.caseNum === "CASE④") {
-                finalOffenseSuccess = !finalOffenseSuccess;
-                this.stats.errors[defenseRole]++;
+            // JはAに勝つ、それ以外はA > K > Q > J
+            let visitorWinsCard = this.doesCardBeat(visitorCard.rank, homeCard.rank);
+            let cardWinnerRole = visitorWinsCard ? 'visitor' : 'home';
+            let isOffenseCardWinner = (cardWinnerRole === offenseRole);
+            const hasRunner = this.bases.some(Boolean);
+            const rawCase = this.currentCase.rawCaseNum;
+
+            // ランナーなし時の代替判定（CASE⑤ / CASE⑥ / CASE⑦ は走者なしなら CASE① 代替）
+            let effectiveCase = rawCase;
+            if (!hasRunner && (rawCase === "CASE⑤" || rawCase === "CASE⑥" || rawCase === "CASE⑦")) {
+                effectiveCase = "CASE①";
             }
-            this.lastBattleSuccess = finalOffenseSuccess;
+
+            // 実際のアクション決定
+            let actionType = 'OUT_1';
+            let isHit = false;
+            let isHomerun = false;
+            let isError = false;
+
+            if (rawCase === "CASE④") {
+                // バッドフラグ：勝者が不利になり、敗者が回避できた（反比例）
+                // 攻撃側が勝ったのに1アウト／守備側が勝ったのに打たれる（シングルまたはランナー進塁）
+                if (isOffenseCardWinner) {
+                    actionType = 'BAD_FLAG_OFFENSE_WIN_OUT';
+                    isHit = false;
+                } else {
+                    actionType = 'BAD_FLAG_DEFENSE_WIN_HIT';
+                    isHit = true;
+                    isError = true;
+                }
+            } else if (effectiveCase === "CASE⑤") {
+                // ランナーイベント（走者あり限定）：バッター自身の進塁なし、走者進塁 or 走者アウト
+                if (isOffenseCardWinner) {
+                    actionType = 'RUNNER_ADVANCE_ONLY';
+                    isHit = false;
+                } else {
+                    actionType = 'RUNNER_CAUGHT_OUT';
+                    isHit = false;
+                }
+            } else if (effectiveCase === "CASE⑥") {
+                // 犠打（走者あり限定）：攻撃成功でもバッターはアウト（犠牲）でランナー進塁・生還
+                if (isOffenseCardWinner) {
+                    actionType = 'SACRIFICE_BUNT_ADVANCE';
+                    isHit = false;
+                } else {
+                    actionType = 'OUT_1';
+                    isHit = false;
+                }
+            } else if (effectiveCase === "CASE⑦") {
+                // 2Bヒット or ダブルプレー（ランナーあり条件）
+                if (isOffenseCardWinner) {
+                    actionType = 'HIT_2B';
+                    isHit = true;
+                } else {
+                    actionType = 'DOUBLE_PLAY_2OUT';
+                    isHit = false;
+                }
+            } else if (effectiveCase === "CASE⑨") {
+                if (isOffenseCardWinner) {
+                    actionType = 'HOMERUN';
+                    isHit = true;
+                    isHomerun = true;
+                } else {
+                    actionType = 'OUT_1';
+                    isHit = false;
+                }
+            } else if (effectiveCase === "CASE⑧") {
+                if (isOffenseCardWinner) {
+                    actionType = 'HIT_1B';
+                    isHit = true;
+                } else {
+                    actionType = 'OUT_3';
+                    isHit = false;
+                }
+            } else if (effectiveCase === "CASE③") {
+                if (isOffenseCardWinner) {
+                    actionType = 'HIT_3B';
+                    isHit = true;
+                } else {
+                    actionType = 'OUT_1';
+                    isHit = false;
+                }
+            } else if (effectiveCase === "CASE②") {
+                if (isOffenseCardWinner) {
+                    actionType = 'HIT_2B';
+                    isHit = true;
+                } else {
+                    actionType = 'OUT_1';
+                    isHit = false;
+                }
+            } else {
+                // CASE①（および走者なし時の代替）
+                if (isOffenseCardWinner) {
+                    actionType = 'HIT_1B';
+                    isHit = true;
+                } else {
+                    actionType = 'OUT_1';
+                    isHit = false;
+                }
+            }
+
+            if (isHit) this.stats.hits[offenseRole]++;
+            if (isHomerun) this.stats.homeRuns[offenseRole]++;
+            if (isError) this.stats.errors[defenseRole]++;
+
+            this.lastBattleOutcome = {
+                cardWinnerRole,
+                isOffenseCardWinner,
+                actionType,
+                isHit,
+                isHomerun,
+                isError,
+                effectiveCase
+            };
 
             if (this.gameMode === 'PVP' && this.pvpSubMode === 'ONLINE' && this.netRole === 'HOST') {
                 this.net.send({
@@ -1276,7 +1493,7 @@
                     currentCase: this.currentCase,
                     battleCards: this.battleCards,
                     isFoul: false,
-                    success: finalOffenseSuccess
+                    outcome: this.lastBattleOutcome
                 });
             }
             this.triggerBattleOutcomeDisplay(false);
@@ -1290,7 +1507,7 @@
                 this.currentPhase = 'ROUTINE_3_FOUL';
                 snd.playTone(440, 0.1);
                 setTimeout(() => snd.seUmpireFoul(), 600);
-                this.updateBoardAndCommentary("カキーン！鋭い打球はファールボール！スタンドへ飛び込みました！");
+                this.updateBoardAndCommentary("同値ファール！同じ球種・読みがぶつかりスタンドへ！");
                 if (this.gameMode === 'PVP') this.startTurnTimer();
                 this.renderAll();
                 return;
@@ -1298,37 +1515,51 @@
 
             this.currentPhase = 'ROUTINE_3_RESULT';
             let offenseRole = this.getOffenseRole();
-            let finalOffenseSuccess = this.lastBattleSuccess;
-            const cNum = this.currentCase.caseNum;
+            const outInfo = this.lastBattleOutcome;
+            const act = outInfo.actionType;
             let commentaryText = "";
 
-            if (finalOffenseSuccess) {
-                if (cNum === "CASE⑨") {
-                    this.stats.homeRuns[offenseRole]++;
-                    this.stats.hits[offenseRole]++;
-                    snd.playHomerunFanfare();
-                    commentaryText = "完璧に捉えた！一撃必殺のケース、特大のホームランだ！";
-                } else if (cNum === "CASE⑤" || cNum === "CASE⑥") {
-                    snd.seHitSequence();
-                    commentaryText = "見事な走塁・作戦成功！ランナーが確実に進塁を決めた！";
-                } else {
-                    this.stats.hits[offenseRole]++;
-                    snd.seHitSequence();
-                    commentaryText = "見事に捉えた！鋭い打球が抜けるクリーンヒット！";
-                }
+            if (act === 'HOMERUN') {
+                snd.playHomerunFanfare();
+                commentaryText = "特大のホームラン！スタンドへ一直線のアーチだ！";
+            } else if (act === 'HIT_3B') {
+                snd.seHitSequence();
+                commentaryText = "フェンス直撃の三塁打！チャンスが一気に広がる！";
+            } else if (act === 'HIT_2B') {
+                snd.seHitSequence();
+                commentaryText = "会心の二塁打！外野の頭を超える鋭い打球！";
+            } else if (act === 'HIT_1B') {
+                snd.seHitSequence();
+                commentaryText = "センター前へ抜けるクリーンヒット！";
+            } else if (act === 'RUNNER_ADVANCE_ONLY') {
+                snd.seHitSequence();
+                commentaryText = "ランナーイベント成功！打者はそのまま、ランナーが進塁！";
+            } else if (act === 'RUNNER_CAUGHT_OUT') {
+                snd.seOutSequence();
+                commentaryText = "バッテリーの好リード！ランナーの進塁を阻止してアウト！";
+            } else if (act === 'SACRIFICE_BUNT_ADVANCE') {
+                snd.seHitSequence();
+                commentaryText = "犠打成功！打者は犠牲アウトだが、ランナーが前進・生還！";
+            } else if (act === 'BAD_FLAG_OFFENSE_WIN_OUT') {
+                snd.seOutSequence();
+                commentaryText = "バッドフラグ発動！攻撃側がカード勝利も不運な1アウト！";
+            } else if (act === 'BAD_FLAG_DEFENSE_WIN_HIT') {
+                snd.seHitSequence();
+                commentaryText = "バッドフラグ発動！守備側がカード勝利も回避できず痛打・進塁！";
+            } else if (act === 'DOUBLE_PLAY_2OUT') {
+                snd.seOutSequence();
+                commentaryText = "痛恨のダブルプレー！守備陣が2アウトを奪った！";
+            } else if (act === 'OUT_3') {
+                snd.seOutSequence();
+                commentaryText = "完璧な守備で3アウトチェンジ！";
             } else {
-                if (cNum === "CASE⑤" || cNum === "CASE⑥") {
-                    snd.seOutSequence();
-                    commentaryText = "バッテリーの好リード！盗塁・進塁の試みが完璧に阻止された！";
-                } else {
-                    snd.seOutSequence();
-                    commentaryText = "好守に阻まれた！バットの芯を外す痛烈なアウト！";
-                }
+                snd.seOutSequence();
+                commentaryText = "打ち取った！1アウト！";
             }
 
             this.updateBoardAndCommentary(commentaryText);
             let oldScore = this.scores[offenseRole];
-            this.applyCorrectCaseResult(finalOffenseSuccess);
+            this.applyCorrectCaseResult(act);
             let scoreAdded = Math.max(0, this.scores[offenseRole] - oldScore);
 
             if (scoreAdded > 0) {
@@ -1344,35 +1575,22 @@
                         snd.seScoreCountStep();
                         this.renderAll();
                         if (i === scoreAdded) {
-                            this.checkMercyOrWalkoffWin();
+                            this.checkWalkoffWin();
                         }
                     }, i * 550);
                     this.scoreTimers.push(t);
                 }
             } else {
-                this.checkMercyOrWalkoffWin();
+                this.checkWalkoffWin();
             }
 
             if (this.gameMode === 'PVP' && !this.gameEnded) this.startTurnTimer();
             this.renderAll();
         }
 
-        checkMercyOrWalkoffWin() {
+        // サヨナラ勝ち判定（最終回裏にホームが勝ち越した瞬間）
+        checkWalkoffWin() {
             if (this.gameEnded) return false;
-            let diff = Math.abs(this.scores.visitor - this.scores.home);
-
-            // 1. 10点差コールドゲーム判定
-            if (diff >= 10) {
-                this.gameEnded = true;
-                this.stopTurnTimer();
-                setTimeout(() => {
-                    alert("【コールドゲーム宣言】\n10点差以上の大差がついたため、コールドゲーム成立です！");
-                    this.endGame(true);
-                }, 350);
-                return true;
-            }
-
-            // 2. サヨナラゲーム判定：【最終回（3回）の裏】で、ホームチームがリードを奪った瞬間のみ発動！
             if (this.inning >= 3 && !this.isTop && this.scores.home > this.scores.visitor) {
                 this.gameEnded = true;
                 this.stopTurnTimer();
@@ -1381,6 +1599,24 @@
                     this.endGame(true);
                 }, 350);
                 return true;
+            }
+            return false;
+        }
+
+        // 裏の攻撃まで終わった時点での10点差コールド判定
+        checkColdGameAtHalfOrFullEnd() {
+            if (this.gameEnded) return false;
+            if (!this.isTop) {
+                const diff = Math.abs(this.scores.visitor - this.scores.home);
+                if (diff >= 10) {
+                    this.gameEnded = true;
+                    this.stopTurnTimer();
+                    setTimeout(() => {
+                        alert(`【コールドゲーム成立】\n${this.inning}回裏終了時点で${diff}点差となったため、コールドゲーム成立です！`);
+                        this.endGame(true);
+                    }, 250);
+                    return true;
+                }
             }
             return false;
         }
@@ -1426,6 +1662,10 @@
                 return;
             }
             if (this.outs >= 3) {
+                // 裏の攻撃終了時点の10点差コールド判定
+                if (this.checkColdGameAtHalfOrFullEnd()) {
+                    return;
+                }
                 snd.seChange();
                 this.outs = 0;
                 this.bases = [false, false, false];
@@ -1557,59 +1797,96 @@
         }
 
         evaluateCase(visitorVal, homeVal) {
-            let d = Math.abs(visitorVal - homeVal);
-            if (d === 1) return { caseNum: "CASE①", description: "ヒット or 1アウト" };
-            if (d === 2) return { caseNum: "CASE②", description: "2Bヒット or 1アウト" };
-            if (d === 3) return { caseNum: "CASE③", description: "3Bヒット or 1アウト" };
-            if (d === 4) return { caseNum: "CASE④", description: "バッドフラグ（勝敗反転）" };
-            if (d === 5) return { caseNum: "CASE⑤", description: this.bases.some(Boolean) ? "盗塁・進塁 or 盗塁阻止(アウト)" : "シングルヒット or 1アウト" };
-            if (d === 6) return { caseNum: "CASE⑥", description: (this.bases.some(Boolean) && this.outs < 2) ? "送りバント成功 or 阻止" : "シングルヒット or 1アウト" };
-            if (d === 7) return { caseNum: "CASE⑦", description: "2Bヒット or Wプレー" };
-            if (d === 8) return { caseNum: "CASE⑧", description: "強襲ヒット or 3者凡退" };
-            return { caseNum: "CASE⑨", description: "ホームラン or アウト" };
+            const d = Math.abs(visitorVal - homeVal);
+            const hasRunner = this.bases.some(Boolean);
+            let rawCase = "CASE⑨";
+            if (d === 1) rawCase = "CASE①";
+            else if (d === 2) rawCase = "CASE②";
+            else if (d === 3) rawCase = "CASE③";
+            else if (d === 4) rawCase = "CASE④";
+            else if (d === 5) rawCase = "CASE⑤";
+            else if (d === 6) rawCase = "CASE⑥";
+            else if (d === 7) rawCase = "CASE⑦";
+            else if (d === 8) rawCase = "CASE⑧";
+            else rawCase = "CASE⑨";
+
+            // 走者なし時の代替（CASE⑤/⑥/⑦は走者なしならCASE①）
+            let effectiveCase = (!hasRunner && (rawCase === "CASE⑤" || rawCase === "CASE⑥" || rawCase === "CASE⑦"))
+                ? "CASE①"
+                : rawCase;
+
+            let desc = "";
+            if (effectiveCase === "CASE⑨") desc = "ホームラン or 1アウト";
+            else if (effectiveCase === "CASE⑧") desc = "ヒット or 3アウト";
+            else if (effectiveCase === "CASE⑦") desc = "2Bヒット or 2アウト(Wプレー)";
+            else if (effectiveCase === "CASE⑥") desc = "犠打(走者進塁+1アウト) or 1アウト";
+            else if (effectiveCase === "CASE⑤") desc = "ランナー進塁(打者不変) or 走者アウト";
+            else if (effectiveCase === "CASE④") desc = "バッドフラグ(勝者不利:攻勝→1死/守勝→打撃)";
+            else if (effectiveCase === "CASE③") desc = "3Bヒット or 1アウト";
+            else if (effectiveCase === "CASE②") desc = "2Bヒット or 1アウト";
+            else desc = "シングルヒット or 1アウト";
+
+            const label = (!hasRunner && rawCase !== effectiveCase) ? `${effectiveCase}(${rawCase}代替)` : effectiveCase;
+
+            return {
+                caseNum: label,
+                rawCaseNum: rawCase,
+                effectiveCaseNum: effectiveCase,
+                description: desc,
+                isBadFlag: rawCase === "CASE④"
+            };
         }
 
         getRankVal(r) { return r === 'A' ? 4 : r === 'K' ? 3 : r === 'Q' ? 2 : 1; }
 
-        applyCorrectCaseResult(ok) {
-            let c = this.currentCase.caseNum, ofs = this.getOffenseRole();
-            if (ok) {
-                if (c === "CASE⑨") {
-                    let scored = (this.bases[0] ? 1 : 0) + (this.bases[1] ? 1 : 0) + (this.bases[2] ? 1 : 0) + 1;
-                    this.scores[ofs] += scored;
-                    this.bases = [false, false, false];
-                } else if (c === "CASE③") {
-                    let scored = (this.bases[0] ? 1 : 0) + (this.bases[1] ? 1 : 0) + (this.bases[2] ? 1 : 0);
-                    this.scores[ofs] += scored;
-                    this.bases = [false, false, true];
-                } else if (c === "CASE②" || c === "CASE⑦") {
-                    let scored = 0;
-                    if (this.bases[2]) { scored++; this.bases[2] = false; }
-                    if (this.bases[1]) { scored++; this.bases[1] = false; }
-                    if (this.bases[0]) { this.bases[2] = true; this.bases[0] = false; }
-                    this.bases[1] = true;
-                    if (scored > 0) this.scores[ofs] += scored;
-                } else if (c === "CASE⑤" || c === "CASE⑥") {
-                    if (this.bases[2]) { this.scores[ofs]++; this.bases[2] = false; }
-                    if (this.bases[1]) { this.bases[2] = true; this.bases[1] = false; }
-                    if (this.bases[0]) { this.bases[1] = true; this.bases[0] = false; }
-                } else {
-                    let scored = 0;
-                    if (this.bases[2]) { scored++; this.bases[2] = false; }
-                    if (this.bases[1]) { this.bases[2] = true; this.bases[1] = false; }
-                    if (this.bases[0]) { this.bases[1] = true; this.bases[0] = false; }
-                    this.bases[0] = true;
-                    if (scored > 0) this.scores[ofs] += scored;
-                }
-            } else {
-                if (c === "CASE⑤" || c === "CASE⑥") {
-                    if (this.bases[0]) this.bases[0] = false;
-                    else if (this.bases[1]) this.bases[1] = false;
-                    else if (this.bases[2]) this.bases[2] = false;
-                    this.outs++;
-                } else if (c === "CASE⑧") this.outs += 3;
-                else if (c === "CASE⑦") { this.outs += 2; this.bases[0] = false; }
-                else this.outs++;
+        advanceRunnersOnly(ofs) {
+            if (this.bases[2]) { this.scores[ofs]++; this.bases[2] = false; }
+            if (this.bases[1]) { this.bases[2] = true; this.bases[1] = false; }
+            if (this.bases[0]) { this.bases[1] = true; this.bases[0] = false; }
+        }
+
+        applyCorrectCaseResult(actionType) {
+            const ofs = this.getOffenseRole();
+
+            if (actionType === 'HOMERUN') {
+                const scored = (this.bases[0] ? 1 : 0) + (this.bases[1] ? 1 : 0) + (this.bases[2] ? 1 : 0) + 1;
+                this.scores[ofs] += scored;
+                this.bases = [false, false, false];
+            } else if (actionType === 'HIT_3B') {
+                const scored = (this.bases[0] ? 1 : 0) + (this.bases[1] ? 1 : 0) + (this.bases[2] ? 1 : 0);
+                this.scores[ofs] += scored;
+                this.bases = [false, false, true];
+            } else if (actionType === 'HIT_2B') {
+                let scored = 0;
+                if (this.bases[2]) { scored++; this.bases[2] = false; }
+                if (this.bases[1]) { scored++; this.bases[1] = false; }
+                if (this.bases[0]) { this.bases[2] = true; this.bases[0] = false; }
+                this.bases[1] = true;
+                if (scored > 0) this.scores[ofs] += scored;
+            } else if (actionType === 'HIT_1B' || actionType === 'BAD_FLAG_DEFENSE_WIN_HIT') {
+                let scored = 0;
+                if (this.bases[2]) { scored++; this.bases[2] = false; }
+                if (this.bases[1]) { scored++; this.bases[1] = false; }
+                if (this.bases[0]) { this.bases[1] = true; this.bases[0] = false; }
+                this.bases[0] = true;
+                if (scored > 0) this.scores[ofs] += scored;
+            } else if (actionType === 'RUNNER_ADVANCE_ONLY') {
+                this.advanceRunnersOnly(ofs);
+            } else if (actionType === 'RUNNER_CAUGHT_OUT') {
+                if (this.bases[0]) this.bases[0] = false;
+                else if (this.bases[1]) this.bases[1] = false;
+                else if (this.bases[2]) this.bases[2] = false;
+                this.outs++;
+            } else if (actionType === 'SACRIFICE_BUNT_ADVANCE') {
+                this.advanceRunnersOnly(ofs);
+                this.outs++;
+            } else if (actionType === 'BAD_FLAG_OFFENSE_WIN_OUT' || actionType === 'OUT_1') {
+                this.outs++;
+            } else if (actionType === 'DOUBLE_PLAY_2OUT') {
+                if (this.bases[0]) this.bases[0] = false;
+                this.outs += 2;
+            } else if (actionType === 'OUT_3') {
+                this.outs += 3;
             }
         }
 
@@ -1642,7 +1919,7 @@
             } else if (this.justStartedPlayBall && this.inning === 1 && this.isTop && this.outs === 0 && !this.isFlagOpened) {
                 cb.innerHTML = `<span style="font-size:13px; color:#ff0; font-weight:900;">プレイボール！</span>`;
             } else if (this.currentPhase === 'ROUTINE_2_SELECT' || this.currentPhase === 'ROUTINE_3_RESULT' || this.currentPhase === 'ROUTINE_3_FOUL') {
-                cb.innerHTML = `<span style="font-size:12px; color:#ff0; font-weight:900;">${this.currentCase.caseNum}</span><br><span style="font-size:10px; color:#fff; font-weight:bold;">${this.currentCase.description}</span>`;
+                cb.innerHTML = `<span style="font-size:11px; color:#ff0; font-weight:900;">${this.currentCase.caseNum}</span><br><span style="font-size:9.5px; color:#fff; font-weight:bold;">${this.currentCase.description}</span>`;
             } else {
                 let activeBases = [];
                 if (this.bases[0]) activeBases.push("1塁");
@@ -1806,7 +2083,7 @@
             if (!p) return;
 
             let currentHand = this.handsData[this.myTeam];
-            let teamLabel = `強 A ≫ K ≫ Q ≫ J（Aキラー）`;
+            let teamLabel = `J>A ≫ A>K>Q>J (同値F)`;
 
             let html = `<div class="effect-guide">${teamLabel}</div><div class="hand-cards-grid">`;
             currentHand.forEach((cd, idx) => {
