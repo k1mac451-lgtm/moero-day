@@ -118,10 +118,10 @@
         .vs:active { transform: scale(0.95); }
         #countdown-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); color: #FFD700; font-size: 3rem; font-weight: 900; display: none; justify-content: center; align-items: center; z-index: 100; text-shadow: 0 0 10px #FF0000, 0 0 20px #FFD700; letter-spacing: 2px; }
 
-        /* 演出用デカテキストオーバーレイ */
+        /* 演出用デカテキスト＆ホームランカットインオーバーレイ */
         #action-effect-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none; z-index: 90; display: flex; justify-content: center; align-items: center; overflow: hidden;
+            pointer-events: none; z-index: 95; display: flex; justify-content: center; align-items: center; overflow: hidden;
         }
         .effect-giant-text {
             position: absolute; font-size: 3.5rem; font-weight: 900; color: #FFFF00;
@@ -149,6 +149,51 @@
             65% { left: calc(50% - 110px); opacity: 1; transform: scale(1.0) rotate(0deg); }
             100% { left: 400px; opacity: 0; transform: scale(1.2) rotate(10deg); }
         }
+
+        /* ホームラン派手カットイン */
+        .hr-cutin-banner {
+            position: absolute;
+            width: 140%;
+            padding: 12px 0;
+            background: linear-gradient(90deg, #b71c1c 0%, #ff1744 25%, #ffd700 50%, #ff1744 75%, #b71c1c 100%);
+            border-top: 3px solid #fff;
+            border-bottom: 3px solid #fff;
+            box-shadow: 0 0 24px rgba(255, 215, 0, 0.95), 0 6px 18px rgba(0, 0, 0, 0.85);
+            transform: rotate(-8deg) scale(0.6);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            animation: hrCutinFlash 1.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        .hr-cutin-logo {
+            font-size: 2.1rem;
+            font-weight: 900;
+            color: #fff;
+            text-shadow: 3px 3px 0 #000, -2px -2px 0 #d50000, 0 0 14px #ffff00;
+            letter-spacing: 3px;
+            line-height: 1.05;
+        }
+        .hr-cutin-sub {
+            font-size: 0.72rem;
+            font-weight: 900;
+            color: #111;
+            background: #ffd700;
+            padding: 1px 8px;
+            border-radius: 3px;
+            margin-top: 3px;
+            letter-spacing: 1px;
+        }
+        @keyframes hrCutinFlash {
+            0% { opacity: 0; transform: translateX(-180px) rotate(-14deg) scale(0.65); }
+            18% { opacity: 1; transform: translateX(0) rotate(-6deg) scale(1.12); }
+            35% { opacity: 1; transform: translateX(0) rotate(-5deg) scale(1.0); }
+            50% { opacity: 1; transform: translateX(0) rotate(-6deg) scale(1.06); }
+            78% { opacity: 1; transform: translateX(0) rotate(-5deg) scale(1.03); }
+            100% { opacity: 0; transform: translateX(220px) rotate(-2deg) scale(1.25); }
+        }
+
         .pos-top-flag { position: absolute; top: calc(50% - 58px); left: calc(50% - 16px); }
         .pos-bottom-flag { position: absolute; top: calc(50% + 28px); left: calc(50% - 16px); }
         .pos-left-battle { position: absolute; left: calc(50% - 54px); top: calc(50% - 15px); }
@@ -352,37 +397,232 @@
                 }
             } catch(e) {}
         }
-        playTone(freq, duration, type='square', vol=0.1) {
+        playTone(freq, duration, type='square', vol=0.1, delaySec=0) {
             this.init();
             if (!this.ctx) return;
             try {
+                const start = this.ctx.currentTime + Math.max(0, delaySec);
                 let osc = this.ctx.createOscillator();
                 let gain = this.ctx.createGain();
                 osc.type = type;
-                osc.frequency.value = freq;
-                gain.gain.setValueAtTime(vol, this.ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + duration);
+                osc.frequency.setValueAtTime(freq, start);
+                gain.gain.setValueAtTime(Math.max(0.0001, vol), start);
+                gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
                 osc.connect(gain); gain.connect(this.ctx.destination);
-                osc.start(); osc.stop(this.ctx.currentTime + duration);
+                osc.start(start); osc.stop(start + duration + 0.02);
             } catch(e) {}
         }
-        playNoise(duration, vol=0.12) {
+        playNoise(duration, vol=0.12, delaySec=0, filterType='bandpass', freq=900, q=1.0) {
             this.init();
             if (!this.ctx) return;
             try {
+                const start = this.ctx.currentTime + Math.max(0, delaySec);
                 let bufferSize = Math.max(1, Math.floor(this.ctx.sampleRate * duration));
                 let buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
                 let data = buffer.getChannelData(0);
                 for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
                 let noise = this.ctx.createBufferSource();
                 noise.buffer = buffer;
+
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = filterType;
+                filter.frequency.setValueAtTime(freq, start);
+                filter.Q.setValueAtTime(q, start);
+
                 let gain = this.ctx.createGain();
-                gain.gain.setValueAtTime(vol, this.ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + duration);
-                noise.connect(gain); gain.connect(this.ctx.destination);
-                noise.start();
+                gain.gain.setValueAtTime(0.001, start);
+                gain.gain.linearRampToValueAtTime(vol, start + Math.min(0.08, duration * 0.25));
+                gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.ctx.destination);
+                noise.start(start);
+                noise.stop(start + duration + 0.02);
             } catch(e) {}
         }
+
+        // 基本パーツ：投球音（ピューン／シュッ）
+        sePitchSound(delaySec = 0) {
+            this.init();
+            if (!this.ctx) return;
+            try {
+                const t0 = this.ctx.currentTime + Math.max(0, delaySec);
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(360, t0);
+                osc.frequency.exponentialRampToValueAtTime(860, t0 + 0.14);
+                gain.gain.setValueAtTime(0.001, t0);
+                gain.gain.linearRampToValueAtTime(0.16, t0 + 0.03);
+                gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.16);
+                osc.connect(gain); gain.connect(this.ctx.destination);
+                osc.start(t0); osc.stop(t0 + 0.18);
+                this.playNoise(0.14, 0.11, delaySec, 'bandpass', 1500, 1.5);
+            } catch(e) {}
+        }
+
+        // 基本パーツ：打撃音（カキーン／パチン）
+        seHitImpact(delaySec = 0.22, power = 1.0) {
+            this.init();
+            if (!this.ctx) return;
+            try {
+                const t0 = this.ctx.currentTime + Math.max(0, delaySec);
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(240 * power, t0);
+                osc.frequency.exponentialRampToValueAtTime(65, t0 + 0.14);
+                gain.gain.setValueAtTime(Math.min(0.5, 0.34 * power), t0);
+                gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.16);
+                osc.connect(gain); gain.connect(this.ctx.destination);
+                osc.start(t0); osc.stop(t0 + 0.18);
+
+                const ring = this.ctx.createOscillator();
+                const ringGain = this.ctx.createGain();
+                ring.type = 'square';
+                ring.frequency.setValueAtTime(1180 * power, t0);
+                ring.frequency.exponentialRampToValueAtTime(620, t0 + 0.09);
+                ringGain.gain.setValueAtTime(0.14, t0);
+                ringGain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.10);
+                ring.connect(ringGain); ringGain.connect(this.ctx.destination);
+                ring.start(t0); ring.stop(t0 + 0.12);
+
+                this.playNoise(0.12, 0.22, delaySec, 'highpass', 900, 0.8);
+            } catch(e) {}
+        }
+
+        // ミットのバシッ！（捕球・三振決め音）
+        seMittSnap(delaySec = 0.20) {
+            this.init();
+            if (!this.ctx) return;
+            try {
+                const t0 = this.ctx.currentTime + Math.max(0, delaySec);
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(195, t0);
+                osc.frequency.exponentialRampToValueAtTime(42, t0 + 0.11);
+                gain.gain.setValueAtTime(0.45, t0);
+                gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.12);
+                osc.connect(gain); gain.connect(this.ctx.destination);
+                osc.start(t0); osc.stop(t0 + 0.14);
+                this.playNoise(0.09, 0.34, delaySec, 'bandpass', 1250, 1.1);
+            } catch(e) {}
+        }
+
+        // ダッシュ音（走者駆け抜けステップ）
+        seDashSteps(delaySec = 0.20) {
+            const stepOffsets = [0, 0.08, 0.16, 0.24, 0.32];
+            stepOffsets.forEach((off, idx) => {
+                const t = delaySec + off;
+                this.playNoise(0.06, 0.18 + idx * 0.015, t, 'bandpass', 700 + idx * 90, 1.4);
+                this.playTone(115 + idx * 8, 0.05, 'triangle', 0.14, t);
+            });
+        }
+
+        // 基本パーツ：歓声
+        seCrowdCheer(delaySec = 0.42, duration = 0.75, vol = 0.18) {
+            this.playNoise(duration, vol, delaySec, 'bandpass', 980, 0.75);
+        }
+
+        // 汎用バトルSE（投球音 → 打撃音 → 歓声）
+        seStandardPitchHitCheer(power = 1.0) {
+            this.sePitchSound(0);
+            this.seHitImpact(0.20, power);
+            this.seCrowdCheer(0.38, 0.75, 0.19);
+        }
+
+        // ランナー無し・守備抑えSE（投球 → ミットのバシッ！ → 歓声）
+        seNoRunnerDefenseOut() {
+            this.sePitchSound(0);
+            this.seMittSnap(0.20);
+            this.seCrowdCheer(0.36, 0.70, 0.20);
+        }
+
+        // ランナーあり CASE⑤/⑥ SE（投球 → ダッシュ音 → 歓声）
+        seRunnerCase5Or6() {
+            this.sePitchSound(0);
+            this.seDashSteps(0.20);
+            this.seCrowdCheer(0.58, 0.75, 0.19);
+        }
+
+        // ホームランファンファーレ：「テッテレ〜」✕3段階上昇（3回目はテッテレ〜〜ッ！と伸ばす）
+        seHomerunFanfare() {
+            this.init();
+            this.sePitchSound(0);
+            this.seHitImpact(0.18, 1.35);
+
+            // 1回目：テッテレ〜（基準音域）
+            const step1Start = 0.36;
+            this.playTone(523.25, 0.09, 'square', 0.20, step1Start);       // テッ
+            this.playTone(659.25, 0.09, 'square', 0.20, step1Start + 0.09); // テ
+            this.playTone(783.99, 0.22, 'square', 0.22, step1Start + 0.18); // レ〜
+
+            // 2回目：テッテレ〜（1音分上昇）
+            const step2Start = 0.82;
+            this.playTone(587.33, 0.09, 'square', 0.22, step2Start);       // テッ
+            this.playTone(739.99, 0.09, 'square', 0.22, step2Start + 0.09); // テ
+            this.playTone(880.00, 0.24, 'square', 0.24, step2Start + 0.18); // レ〜
+
+            // 3回目：テッテレ〜〜ッ！（さらに上昇＋最後を長く伸ばす）
+            const step3Start = 1.30;
+            this.playTone(659.25, 0.09, 'square', 0.24, step3Start);       // テッ
+            this.playTone(830.61, 0.09, 'square', 0.24, step3Start + 0.09); // テ
+            this.playTone(1046.50, 0.75, 'square', 0.27, step3Start + 0.18); // レ〜〜ッ！（長尺伸ばし）
+
+            // 歓声を重ねて盛り上げ
+            this.seCrowdCheer(1.45, 1.15, 0.24);
+        }
+
+        // フラグオープン（笛「ぴーっ、ぴ〜、ピピーッ！」＋太鼓「ドーン・ドーン・ドン・ドン・ドン！」）
+        seFlagOpenCheer() {
+            this.init();
+            if (!this.ctx) return;
+
+            const now = this.ctx.currentTime;
+            const whistles = [
+                { freq: 1480, start: 0.00, dur: 0.16, slideTo: 1560 },
+                { freq: 1560, start: 0.22, dur: 0.22, slideTo: 1660 },
+                { freq: 1760, start: 0.50, dur: 0.10, slideTo: 1760 },
+                { freq: 1975, start: 0.62, dur: 0.26, slideTo: 2093 }
+            ];
+            whistles.forEach(w => {
+                const t0 = now + w.start;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(w.freq, t0);
+                osc.frequency.linearRampToValueAtTime(w.slideTo, t0 + w.dur);
+                gain.gain.setValueAtTime(0.001, t0);
+                gain.gain.linearRampToValueAtTime(0.18, t0 + 0.02);
+                gain.gain.setValueAtTime(0.16, t0 + w.dur * 0.7);
+                gain.gain.exponentialRampToValueAtTime(0.001, t0 + w.dur);
+                osc.connect(gain); gain.connect(this.ctx.destination);
+                osc.start(t0); osc.stop(t0 + w.dur + 0.02);
+            });
+
+            const drums = [
+                { start: 0.02, dur: 0.28, startFreq: 105, endFreq: 38, vol: 0.42 },
+                { start: 0.34, dur: 0.28, startFreq: 105, endFreq: 38, vol: 0.42 },
+                { start: 0.66, dur: 0.14, startFreq: 115, endFreq: 42, vol: 0.38 },
+                { start: 0.82, dur: 0.14, startFreq: 115, endFreq: 42, vol: 0.38 },
+                { start: 0.98, dur: 0.18, startFreq: 130, endFreq: 36, vol: 0.46 }
+            ];
+            drums.forEach(d => {
+                const t0 = now + d.start;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(d.startFreq, t0);
+                osc.frequency.exponentialRampToValueAtTime(d.endFreq, t0 + d.dur);
+                gain.gain.setValueAtTime(d.vol, t0);
+                gain.gain.exponentialRampToValueAtTime(0.001, t0 + d.dur + 0.02);
+                osc.connect(gain); gain.connect(this.ctx.destination);
+                osc.start(t0); osc.stop(t0 + d.dur + 0.03);
+            });
+        }
+
         seLightningSpark() {
             this.init();
             if (!this.ctx) return;
@@ -399,24 +639,6 @@
                 osc.start(t); osc.stop(t + 0.22);
                 this.playNoise(0.15, 0.22);
             } catch(e) {}
-        }
-        seThemeJingle() {
-            this.init();
-            const phrase = [
-                { f: 587.33, d: 0.065, t: 0 },
-                { f: 659.25, d: 0.065, t: 65 },
-                { f: 783.99, d: 0.065, t: 130 },
-                { f: 987.77, d: 0.075, t: 195 },
-                { f: 880.00, d: 0.11,  t: 270 },
-                { f: 587.33, d: 0.065, t: 430 },
-                { f: 659.25, d: 0.065, t: 495 },
-                { f: 783.99, d: 0.065, t: 560 },
-                { f: 1046.50,d: 0.075, t: 625 },
-                { f: 1174.66,d: 0.18,  t: 700 }
-            ];
-            phrase.forEach(n => {
-                setTimeout(() => this.playTone(n.f, n.d, 'square', 0.18), n.t);
-            });
         }
         playGameStartHitAndCheers() {
             this.init();
@@ -452,12 +674,6 @@
             let notes = [523.25, 659.25, 783.99, 1046.50];
             notes.forEach((f, idx) => setTimeout(() => this.playTone(f, idx === 3 ? 0.45 : 0.12, 'square', 0.18), idx * 130));
         }
-        playHomerunFanfare() {
-            this.init();
-            let notes = [523.25, 659.25, 783.99, 1046.50, 783.99, 1046.50, 1318.51];
-            notes.forEach((f, idx) => setTimeout(() => this.playTone(f, idx >= 5 ? 0.3 : 0.1, 'square', 0.22), idx * 110));
-            setTimeout(() => this.playCheersSequenceWithWhistle(), 800);
-        }
         playGameSetFanfare() {
             this.init();
             let notes = [783.99, 659.25, 523.25, 392.00, 523.25, 659.25, 783.99];
@@ -474,15 +690,6 @@
             this.playNoise(0.09, 0.12);
             setTimeout(() => this.playTone(190, 0.1, 'triangle', 0.18), 50);
         }
-        seBattleRoutine(isSuccess) {
-            this.seLightningSpark();
-            setTimeout(() => {
-                this.playTone(isSuccess ? 1174.66 : 330, 0.28, 'square', 0.25);
-                setTimeout(() => this.playCheersSequenceWithWhistle(), 280);
-            }, 220);
-        }
-        seOutSequence() { this.seBattleRoutine(false); }
-        seHitSequence() { this.seBattleRoutine(true); }
         seUmpireFoul() {
             this.playTone(493.88, 0.12, 'sawtooth', 0.22);
             setTimeout(() => this.playTone(739.99, 0.24, 'sawtooth', 0.25), 120);
@@ -520,7 +727,6 @@
             this.serverAwake = false;
         }
 
-        // Render Freeプランのスリープ復帰待ち（ウェイクアップ確認）
         async wakeUpServer(onProgress) {
             this.serverAwake = false;
             const maxAttempts = 8;
@@ -565,7 +771,6 @@
                 this.retryTimer = null;
             }
 
-            // 同一端末・別タブ同期用チャネル
             if (window.BroadcastChannel) {
                 if (this.channel) this.channel.close();
                 this.channel = new BroadcastChannel('black_dome_room_' + roomId);
@@ -575,10 +780,8 @@
                 };
             }
 
-            // PeerJS接続の開始
             this.connectPeer();
 
-            // 定期Ping / ローカル同期ポーリング
             if (this.pingTimer) clearInterval(this.pingTimer);
             this.pingTimer = setInterval(() => {
                 if (!this.roomId || this.manualClose) return;
@@ -845,7 +1048,10 @@
                 actionType: 'OUT_1',
                 isHit: false,
                 isHomerun: false,
-                isError: false
+                isError: false,
+                hadRunnerBefore: false,
+                rawCaseNum: 'CASE⑨',
+                effectiveCaseNum: 'CASE⑨'
             };
             this.turnTimer = null;
             this.timeLeft = 30;
@@ -1155,7 +1361,7 @@
                     this.stopTurnTimer();
                     return;
                 }
-                this.timeLeft--;
+                this.timeLeft = Math.max(0, this.timeLeft - 1);
                 this.updateIndependentTimerDisplay();
                 if (this.timeLeft <= 0) {
                     this.stopTurnTimer();
@@ -1175,22 +1381,71 @@
             this.renderAll();
         }
 
+        // 通信タイマー0秒時の強制進行（フリーズ防止）
         handleTimeOutAutoAction() {
             if (this.gameMode !== 'PVP' || this.gameEnded) return;
+
             if (this.currentPhase === 'ROUTINE_1_STATUS' && !this.isFlagOpened) {
                 this.playerFlagReady = true;
                 this.opponentFlagReady = true;
+                if (this.pvpSubMode === 'ONLINE') {
+                    this.net.send({ type: 'FLAG_READY', timeoutAuto: true });
+                }
                 this.executePhase1_FlagOpen();
-            } else if (this.currentPhase === 'ROUTINE_2_SELECT' && !this.playerReady) {
-                if (this.selectedCardIndex === null) {
-                    let currentHand = this.handsData[this.myTeam];
-                    let unusedIndices = currentHand.map((c, i) => c.used ? null : i).filter(v => v !== null);
-                    if (unusedIndices.length > 0) {
-                        let randIdx = unusedIndices[Math.floor(Math.random() * unusedIndices.length)];
-                        this.selectCard(randIdx);
+                return;
+            }
+
+            if (this.currentPhase === 'ROUTINE_2_SELECT') {
+                let currentHand = this.handsData[this.myTeam];
+                if (!this.playerReady) {
+                    let chosenCard = null;
+                    if (this.selectedCardIndex !== null && currentHand[this.selectedCardIndex]) {
+                        chosenCard = currentHand[this.selectedCardIndex];
+                        chosenCard.used = true;
+                    } else {
+                        let unusedList = currentHand.filter(c => !c.used);
+                        if (unusedList.length === 0) {
+                            currentHand.forEach(c => c.used = false);
+                            unusedList = currentHand;
+                        }
+                        chosenCard = unusedList[Math.floor(Math.random() * unusedList.length)];
+                        chosenCard.used = true;
+                        this.selectedCardIndex = currentHand.indexOf(chosenCard);
+                    }
+                    let myBattleCard = { id: chosenCard.id, rank: chosenCard.rank, color: chosenCard.color, used: true };
+                    if (this.myTeam === 'REDS') this.battleCards.visitor = myBattleCard;
+                    else this.battleCards.home = myBattleCard;
+                    this.playerReady = true;
+                    if (this.pvpSubMode === 'ONLINE') {
+                        this.net.send({ type: 'CARD_SELECT', card: myBattleCard, timeoutAuto: true });
                     }
                 }
-                this.tryConfirmSetup();
+
+                // 相手未応答でも0秒到達時にフリーズさせず進行
+                if (!this.opponentReady) {
+                    let aiTeam = (this.myTeam === 'REDS') ? 'BLACKS' : 'REDS';
+                    let oppPool = this.handsData[aiTeam];
+                    let unusedOpp = oppPool.filter(c => !c.used);
+                    if (unusedOpp.length === 0) {
+                        oppPool.forEach(c => c.used = false);
+                        unusedOpp = oppPool;
+                    }
+                    let fallbackCard = unusedOpp[Math.floor(Math.random() * unusedOpp.length)];
+                    fallbackCard.used = true;
+                    let oppBattleCard = { id: fallbackCard.id, rank: fallbackCard.rank, color: fallbackCard.color, used: true };
+                    if (aiTeam === 'REDS') this.battleCards.visitor = oppBattleCard;
+                    else this.battleCards.home = oppBattleCard;
+                    this.opponentReady = true;
+                }
+
+                this.checkBothReadyAndBattle();
+                return;
+            }
+
+            if (this.currentPhase === 'ROUTINE_3_FOUL') {
+                this.executePhase4_FoulReset(false);
+            } else if (this.currentPhase === 'ROUTINE_3_RESULT') {
+                this.executePhase4_ResetAndNext(false);
             }
         }
 
@@ -1278,14 +1533,14 @@
             this.battleCards.home = null;
             this.selectedCardIndex = null;
 
-            snd.seThemeJingle();
+            snd.seFlagOpenCheer();
             this.triggerGiantTextEffect('OPEN');
             const flagValues = [2,3,4,5,6,7,8,9,10];
             this.flagDeck.visitorVal = flagValues[Math.floor(Math.random() * flagValues.length)];
             this.flagDeck.homeVal = flagValues[Math.floor(Math.random() * flagValues.length)];
             this.currentCase = this.evaluateCase(this.flagDeck.visitorVal, this.flagDeck.homeVal);
 
-            this.updateBoardAndCommentary("でれでれんでれん！さぁ打席へ！このケースの読み合いが始まる！");
+            this.updateBoardAndCommentary("ぴーっ、ぴ〜、ピピーッ！ドーン・ドーン・ドン・ドン・ドン！勝負のフラグオープン！");
             if (this.gameMode === 'PVP') this.startTurnTimer();
             this.renderAll();
         }
@@ -1310,6 +1565,12 @@
                 bMid.textContent = 'BATTLE';
                 overlay.appendChild(bMid);
                 setTimeout(() => { overlay.innerHTML = ''; }, 900);
+            } else if (type === 'HOMERUN') {
+                let banner = document.createElement('div');
+                banner.className = 'hr-cutin-banner';
+                banner.innerHTML = `<div class="hr-cutin-logo">HOMERUN!!</div><div class="hr-cutin-sub">テッテレ〜♪ テッテレ〜♪ テッテレ〜〜ッ！</div>`;
+                overlay.appendChild(banner);
+                setTimeout(() => { overlay.innerHTML = ''; }, 1650);
             }
         }
 
@@ -1575,13 +1836,12 @@
             let visitorWinsCard = this.doesCardBeat(visitorCard.rank, homeCard.rank);
             let cardWinnerRole = visitorWinsCard ? 'visitor' : 'home';
             let isOffenseCardWinner = (cardWinnerRole === offenseRole);
-            const hasRunner = this.bases.some(Boolean);
+            const hadRunnerBefore = this.bases.some(Boolean);
             const rawCase = this.currentCase.rawCaseNum;
 
-            let effectiveCase = rawCase;
-            if (!hasRunner && (rawCase === "CASE⑤" || rawCase === "CASE⑥" || rawCase === "CASE⑦")) {
-                effectiveCase = "CASE①";
-            }
+            let effectiveCase = (!hadRunnerBefore && (rawCase === "CASE⑤" || rawCase === "CASE⑥" || rawCase === "CASE⑦"))
+                ? "CASE①"
+                : rawCase;
 
             let actionType = 'OUT_1';
             let isHit = false;
@@ -1675,7 +1935,9 @@
                 isHit,
                 isHomerun,
                 isError,
-                effectiveCase
+                hadRunnerBefore,
+                rawCaseNum: rawCase,
+                effectiveCaseNum: effectiveCase
             };
 
             if (this.gameMode === 'PVP' && this.pvpSubMode === 'ONLINE' && this.netRole === 'HOST') {
@@ -1689,6 +1951,41 @@
                 });
             }
             this.triggerBattleOutcomeDisplay(false);
+        }
+
+        playBattleOutcomeSE(outInfo) {
+            const act = outInfo.actionType;
+            const hadRunner = !!outInfo.hadRunnerBefore;
+            const rawCase = outInfo.rawCaseNum;
+            const effCase = outInfo.effectiveCaseNum;
+
+            if (act === 'HOMERUN') {
+                this.triggerGiantTextEffect('HOMERUN');
+                snd.seHomerunFanfare();
+                return;
+            }
+
+            // ランナーあり時の CASE⑤ / CASE⑥ は「投球 → ダッシュ音 → 歓声」
+            if (hadRunner && (rawCase === 'CASE⑤' || rawCase === 'CASE⑥' || effCase === 'CASE⑤' || effCase === 'CASE⑥')) {
+                snd.seRunnerCase5Or6();
+                return;
+            }
+
+            // ランナー無しの時に守備が抑えた時（アウト）は「投球 → ミットのバシッ！ → 歓声」
+            const isDefenseSuppressed = !outInfo.isHit && (
+                act === 'OUT_1' ||
+                act === 'OUT_3' ||
+                act === 'DOUBLE_PLAY_2OUT' ||
+                act === 'BAD_FLAG_OFFENSE_WIN_OUT'
+            );
+            if (!hadRunner && isDefenseSuppressed) {
+                snd.seNoRunnerDefenseOut();
+                return;
+            }
+
+            // 基本は「投球音 → 打撃音 → 歓声」
+            const power = (act === 'HIT_3B' || act === 'HIT_2B') ? 1.18 : 1.0;
+            snd.seStandardPitchHitCheer(power);
         }
 
         triggerBattleOutcomeDisplay(isFoul) {
@@ -1712,43 +2009,38 @@
             let commentaryText = "";
 
             if (act === 'HOMERUN') {
-                snd.playHomerunFanfare();
-                commentaryText = "特大のホームラン！スタンドへ一直線のアーチだ！";
+                commentaryText = "特大のホームラン！テッテレ〜♪ テッテレ〜♪ テッテレ〜〜ッ！";
             } else if (act === 'HIT_3B') {
-                snd.seHitSequence();
                 commentaryText = "フェンス直撃の三塁打！チャンスが一気に広がる！";
             } else if (act === 'HIT_2B') {
-                snd.seHitSequence();
                 commentaryText = "会心の二塁打！外野の頭を超える鋭い打球！";
             } else if (act === 'HIT_1B') {
-                snd.seHitSequence();
                 commentaryText = "センター前へ抜けるクリーンヒット！";
             } else if (act === 'RUNNER_ADVANCE_ONLY') {
-                snd.seHitSequence();
-                commentaryText = "ランナーイベント成功！打者はそのまま、ランナーが進塁！";
+                commentaryText = "ランナーイベント成功！ダッシュで進塁！";
             } else if (act === 'RUNNER_CAUGHT_OUT') {
-                snd.seOutSequence();
                 commentaryText = "バッテリーの好リード！ランナーの進塁を阻止してアウト！";
             } else if (act === 'SACRIFICE_BUNT_ADVANCE') {
-                snd.seHitSequence();
                 commentaryText = "犠打成功！打者は犠牲アウトだが、ランナーが前進・生還！";
             } else if (act === 'BAD_FLAG_OFFENSE_WIN_OUT') {
-                snd.seOutSequence();
-                commentaryText = "バッドフラグ発動！攻撃側がカード勝利も不運な1アウト！";
+                commentaryText = !outInfo.hadRunnerBefore
+                    ? "バッドフラグ発動！ミットのバシッ！で抑えられた！"
+                    : "バッドフラグ発動！攻撃側がカード勝利も不運なアウト！";
             } else if (act === 'BAD_FLAG_DEFENSE_WIN_HIT') {
-                snd.seHitSequence();
                 commentaryText = "バッドフラグ発動！守備側がカード勝利も回避できず痛打・進塁！";
             } else if (act === 'DOUBLE_PLAY_2OUT') {
-                snd.seOutSequence();
                 commentaryText = "痛恨のダブルプレー！守備陣が2アウトを奪った！";
             } else if (act === 'OUT_3') {
-                snd.seOutSequence();
-                commentaryText = "完璧な守備で3アウトチェンジ！";
+                commentaryText = !outInfo.hadRunnerBefore
+                    ? "ミットのバシッ！完璧な投球で3アウトチェンジ！"
+                    : "完璧な守備で3アウトチェンジ！";
             } else {
-                snd.seOutSequence();
-                commentaryText = "打ち取った！1アウト！";
+                commentaryText = !outInfo.hadRunnerBefore
+                    ? "投球→ミットのバシッ！打ち取って1アウト！"
+                    : "打ち取った！1アウト！";
             }
 
+            this.playBattleOutcomeSE(outInfo);
             this.updateBoardAndCommentary(commentaryText);
             let oldScore = this.scores[offenseRole];
             this.applyCorrectCaseResult(act);
