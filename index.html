@@ -214,7 +214,7 @@
         .timer-board.pos-visitor { left: 4px; right: auto; }
         .timer-board.pos-home { right: 4px; left: auto; }
 
-        .l3 { height: 42px; background: #000; color: #ff0; font-size: 11.5px; font-weight: 900; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 2px 6px; border-bottom: 2px solid #333; flex-shrink: 0; line-height: 1.35; letter-spacing: 0.3px; }
+        .l3 { height: 42px; background: #000; color: #ff0; font-size: 11px; font-weight: 700; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 2px 6px; border-bottom: 2px solid #333; flex-shrink: 0; line-height: 1.3; letter-spacing: 0.2px; }
         .l4 { height: 175px; background: #2e6930; display: flex; padding: 3px; gap: 3px; flex-shrink: 0; }
         .l4-left, .l4-right { width: 50%; background: #1e3f20; border: 2px solid #112d12; border-radius: 5px; display: flex; flex-direction: column; padding: 3px; height: 100%; }
         .l4-right { justify-content: space-between; gap: 2px; }
@@ -375,7 +375,7 @@
             <div class="game-card card-hidden pos-right-battle" id="pos-right-battle" onclick="gameLoop.returnCardFromBattle('right')"></div>
         </div>
         <div class="l3" id="commentary-box">
-            <span style="color:#fff;">爽やかな青空のデーゲーム！間もなく試合開始です…</span>
+            <span style="color:#fff;">まもなくプレイボール。両軍ベンチの動きに注目が集まります。</span>
         </div>
         <div class="l4">
             <div class="l4-left"><div class="foul-grid-16" id="foul-grid-container"></div></div>
@@ -442,7 +442,49 @@
             } catch(e) {}
         }
 
-        // 基本パーツ：投球音（ピューン／シュッ）
+        // 歓声パーツ：観客のざわめき＋指笛「ぴゅ〜いっ！」＋ピロピロしたガヤ歓声
+        seCrowdCheer(delaySec = 0.42, duration = 0.85, vol = 0.18) {
+            this.init();
+            if (!this.ctx) return;
+
+            // 1. 観客の歓声ベース
+            this.playNoise(duration, vol, delaySec, 'bandpass', 980, 0.72);
+
+            // 2. 指笛「ぴゅ〜いっ！」
+            try {
+                const whistleStart = this.ctx.currentTime + Math.max(0, delaySec + 0.08);
+                const wOsc = this.ctx.createOscillator();
+                const wGain = this.ctx.createGain();
+                wOsc.type = 'sine';
+                wOsc.frequency.setValueAtTime(1650, whistleStart);
+                wOsc.frequency.exponentialRampToValueAtTime(2480, whistleStart + 0.14);
+                wOsc.frequency.exponentialRampToValueAtTime(2150, whistleStart + 0.28);
+
+                wGain.gain.setValueAtTime(0.001, whistleStart);
+                wGain.gain.linearRampToValueAtTime(Math.min(0.16, vol * 0.85), whistleStart + 0.03);
+                wGain.gain.setValueAtTime(Math.min(0.14, vol * 0.75), whistleStart + 0.18);
+                wGain.gain.exponentialRampToValueAtTime(0.0001, whistleStart + 0.30);
+
+                wOsc.connect(wGain);
+                wGain.connect(this.ctx.destination);
+                wOsc.start(whistleStart);
+                wOsc.stop(whistleStart + 0.32);
+            } catch(e) {}
+
+            // 3. ピロピロしたガヤ歓声（高い音域の軽やかな揺れ）
+            const piroNotes = [
+                { f: 1850, d: 0.05, t: 0.16 },
+                { f: 2220, d: 0.05, t: 0.21 },
+                { f: 2640, d: 0.06, t: 0.26 },
+                { f: 2050, d: 0.05, t: 0.34 },
+                { f: 2480, d: 0.07, t: 0.39 }
+            ];
+            piroNotes.forEach(p => {
+                this.playTone(p.f, p.d, 'triangle', Math.min(0.08, vol * 0.42), delaySec + p.t);
+            });
+        }
+
+        // 基本パーツ：投球音
         sePitchSound(delaySec = 0) {
             this.init();
             if (!this.ctx) return;
@@ -462,7 +504,7 @@
             } catch(e) {}
         }
 
-        // 基本パーツ：打撃音（カキーン／パチン）
+        // 基本パーツ：打撃音
         seHitImpact(delaySec = 0.22, power = 1.0) {
             this.init();
             if (!this.ctx) return;
@@ -521,30 +563,25 @@
             });
         }
 
-        // 基本パーツ：歓声
-        seCrowdCheer(delaySec = 0.42, duration = 0.75, vol = 0.18) {
-            this.playNoise(duration, vol, delaySec, 'bandpass', 980, 0.75);
-        }
-
         // 汎用バトルSE（投球音 → 打撃音 → 歓声）
         seStandardPitchHitCheer(power = 1.0) {
             this.sePitchSound(0);
             this.seHitImpact(0.20, power);
-            this.seCrowdCheer(0.38, 0.75, 0.19);
+            this.seCrowdCheer(0.38, 0.80, 0.19);
         }
 
         // ランナー無し・守備抑えSE（投球 → ミットのバシッ！ → 歓声）
         seNoRunnerDefenseOut() {
             this.sePitchSound(0);
             this.seMittSnap(0.20);
-            this.seCrowdCheer(0.36, 0.70, 0.20);
+            this.seCrowdCheer(0.36, 0.75, 0.20);
         }
 
         // ランナーあり CASE⑤/⑥ SE（投球 → ダッシュ音 → 歓声）
         seRunnerCase5Or6() {
             this.sePitchSound(0);
             this.seDashSteps(0.20);
-            this.seCrowdCheer(0.58, 0.75, 0.19);
+            this.seCrowdCheer(0.58, 0.80, 0.19);
         }
 
         // ホームランファンファーレ：「テッテレ〜」✕3段階上昇（3回目はテッテレ〜〜ッ！と伸ばす）
@@ -553,40 +590,63 @@
             this.sePitchSound(0);
             this.seHitImpact(0.18, 1.35);
 
-            // 1回目：テッテレ〜（基準音域）
             const step1Start = 0.36;
-            this.playTone(523.25, 0.09, 'square', 0.20, step1Start);       // テッ
-            this.playTone(659.25, 0.09, 'square', 0.20, step1Start + 0.09); // テ
-            this.playTone(783.99, 0.22, 'square', 0.22, step1Start + 0.18); // レ〜
+            this.playTone(523.25, 0.09, 'square', 0.20, step1Start);
+            this.playTone(659.25, 0.09, 'square', 0.20, step1Start + 0.09);
+            this.playTone(783.99, 0.22, 'square', 0.22, step1Start + 0.18);
 
-            // 2回目：テッテレ〜（1音分上昇）
             const step2Start = 0.82;
-            this.playTone(587.33, 0.09, 'square', 0.22, step2Start);       // テッ
-            this.playTone(739.99, 0.09, 'square', 0.22, step2Start + 0.09); // テ
-            this.playTone(880.00, 0.24, 'square', 0.24, step2Start + 0.18); // レ〜
+            this.playTone(587.33, 0.09, 'square', 0.22, step2Start);
+            this.playTone(739.99, 0.09, 'square', 0.22, step2Start + 0.09);
+            this.playTone(880.00, 0.24, 'square', 0.24, step2Start + 0.18);
 
-            // 3回目：テッテレ〜〜ッ！（さらに上昇＋最後を長く伸ばす）
             const step3Start = 1.30;
-            this.playTone(659.25, 0.09, 'square', 0.24, step3Start);       // テッ
-            this.playTone(830.61, 0.09, 'square', 0.24, step3Start + 0.09); // テ
-            this.playTone(1046.50, 0.75, 'square', 0.27, step3Start + 0.18); // レ〜〜ッ！（長尺伸ばし）
+            this.playTone(659.25, 0.09, 'square', 0.24, step3Start);
+            this.playTone(830.61, 0.09, 'square', 0.24, step3Start + 0.09);
+            this.playTone(1046.50, 0.75, 'square', 0.27, step3Start + 0.18);
 
-            // 歓声を重ねて盛り上げ
             this.seCrowdCheer(1.45, 1.15, 0.24);
         }
 
-        // フラグオープン（笛「ぴーっ、ぴ〜、ピピーッ！」＋太鼓「ドーン・ドーン・ドン・ドン・ドン！」）
+        // フラグオープンSE：
+        // 太鼓「ドーン・ドーン・ドン・ドン・ドン！」に重ねて笛「ぴーっ、ぴーっ、ピッピッピッ！」、最後は太鼓だけで「ドン・ドン・ドン！」
         seFlagOpenCheer() {
             this.init();
             if (!this.ctx) return;
 
             const now = this.ctx.currentTime;
-            const whistles = [
-                { freq: 1480, start: 0.00, dur: 0.16, slideTo: 1560 },
-                { freq: 1560, start: 0.22, dur: 0.22, slideTo: 1660 },
-                { freq: 1760, start: 0.50, dur: 0.10, slideTo: 1760 },
-                { freq: 1975, start: 0.62, dur: 0.26, slideTo: 2093 }
+
+            // メイン太鼓リズム：「ドーン・ドーン・ドン・ドン・ドン！」（0.00s〜0.92s）
+            const mainDrums = [
+                { start: 0.00, dur: 0.22, startFreq: 105, endFreq: 38, vol: 0.42 }, // ドーン
+                { start: 0.24, dur: 0.22, startFreq: 105, endFreq: 38, vol: 0.42 }, // ドーン
+                { start: 0.48, dur: 0.12, startFreq: 115, endFreq: 42, vol: 0.38 }, // ドン
+                { start: 0.62, dur: 0.12, startFreq: 115, endFreq: 42, vol: 0.38 }, // ドン
+                { start: 0.76, dur: 0.14, startFreq: 125, endFreq: 40, vol: 0.42 }  // ドン
             ];
+
+            mainDrums.forEach(d => {
+                const t0 = now + d.start;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(d.startFreq, t0);
+                osc.frequency.exponentialRampToValueAtTime(d.endFreq, t0 + d.dur);
+                gain.gain.setValueAtTime(d.vol, t0);
+                gain.gain.exponentialRampToValueAtTime(0.001, t0 + d.dur + 0.02);
+                osc.connect(gain); gain.connect(this.ctx.destination);
+                osc.start(t0); osc.stop(t0 + d.dur + 0.03);
+            });
+
+            // 重ねる笛：「ぴーっ、ぴーっ、ピッピッピッ！」（0.03s〜0.86s）
+            const whistles = [
+                { freq: 1568, start: 0.03, dur: 0.17, slideTo: 1620 }, // ぴーっ
+                { freq: 1568, start: 0.27, dur: 0.17, slideTo: 1620 }, // ぴーっ
+                { freq: 1760, start: 0.50, dur: 0.07, slideTo: 1760 }, // ピッ
+                { freq: 1865, start: 0.63, dur: 0.07, slideTo: 1865 }, // ピッ
+                { freq: 1975, start: 0.77, dur: 0.08, slideTo: 2040 }  // ピッ
+            ];
+
             whistles.forEach(w => {
                 const t0 = now + w.start;
                 const osc = this.ctx.createOscillator();
@@ -595,21 +655,21 @@
                 osc.frequency.setValueAtTime(w.freq, t0);
                 osc.frequency.linearRampToValueAtTime(w.slideTo, t0 + w.dur);
                 gain.gain.setValueAtTime(0.001, t0);
-                gain.gain.linearRampToValueAtTime(0.18, t0 + 0.02);
+                gain.gain.linearRampToValueAtTime(0.18, t0 + 0.015);
                 gain.gain.setValueAtTime(0.16, t0 + w.dur * 0.7);
                 gain.gain.exponentialRampToValueAtTime(0.001, t0 + w.dur);
                 osc.connect(gain); gain.connect(this.ctx.destination);
                 osc.start(t0); osc.stop(t0 + w.dur + 0.02);
             });
 
-            const drums = [
-                { start: 0.02, dur: 0.28, startFreq: 105, endFreq: 38, vol: 0.42 },
-                { start: 0.34, dur: 0.28, startFreq: 105, endFreq: 38, vol: 0.42 },
-                { start: 0.66, dur: 0.14, startFreq: 115, endFreq: 42, vol: 0.38 },
-                { start: 0.82, dur: 0.14, startFreq: 115, endFreq: 42, vol: 0.38 },
-                { start: 0.98, dur: 0.18, startFreq: 130, endFreq: 36, vol: 0.46 }
+            // ラスト締め：笛なしで太鼓だけの「ドン・ドン・ドン！」（0.98s〜1.44s）
+            const outroDrums = [
+                { start: 0.98, dur: 0.13, startFreq: 115, endFreq: 40, vol: 0.42 }, // ドン
+                { start: 1.14, dur: 0.13, startFreq: 115, endFreq: 40, vol: 0.42 }, // ドン
+                { start: 1.30, dur: 0.20, startFreq: 135, endFreq: 34, vol: 0.48 }  // ドン！
             ];
-            drums.forEach(d => {
+
+            outroDrums.forEach(d => {
                 const t0 = now + d.start;
                 const osc = this.ctx.createOscillator();
                 const gain = this.ctx.createGain();
@@ -1062,6 +1122,85 @@
             this.stats = { hits: { visitor: 0, home: 0 }, errors: { visitor: 0, home: 0 }, homeRuns: { visitor: 0, home: 0 } };
         }
 
+        getTeamLabelByRole(role) {
+            if (this.gameMode === 'PVP') {
+                return role === 'visitor' ? 'REDS' : 'BLACKS';
+            }
+            return role === 'visitor' ? 'BLACKS' : 'REDS';
+        }
+
+        getSituationContext(runsScored = 0) {
+            const offenseRole = this.getOffenseRole();
+            const defenseRole = this.getDefenseRole();
+            const offenseName = this.getTeamLabelByRole(offenseRole);
+            const defenseName = this.getTeamLabelByRole(defenseRole);
+            const isBottomFinal = (this.inning >= 3 && !this.isTop);
+            const diffBefore = Math.abs(this.scores.visitor - this.scores.home);
+
+            let situationTag = "";
+            if (this.scores.visitor === this.scores.home) {
+                situationTag = isBottomFinal ? "同点の最終回裏" : "振り出しの同点";
+            } else {
+                const leaderRole = this.scores.visitor > this.scores.home ? 'visitor' : 'home';
+                const leaderName = this.getTeamLabelByRole(leaderRole);
+                const offenseTrailing = (leaderRole !== offenseRole);
+                if (offenseTrailing && isBottomFinal && diffBefore <= 3) {
+                    situationTag = `逆転サヨナラの好機（${leaderName} ${diffBefore}点リード）`;
+                } else if (offenseTrailing && diffBefore <= 2) {
+                    situationTag = `${offenseName}が${diffBefore}点差を追う反撃の場面`;
+                } else if (offenseTrailing) {
+                    situationTag = `${leaderName}が${diffBefore}点リード、${offenseName}は点差を詰める展開`;
+                } else {
+                    situationTag = `${offenseName}が${diffBefore}点リードで追加点を狙う場面`;
+                }
+            }
+            return { offenseName, defenseName, situationTag, runsScored };
+        }
+
+        buildLiveCommentary(actionType, outInfo, runsScored = 0) {
+            const ctx = this.getSituationContext(runsScored);
+            const inningLabel = `${this.inning}回${this.isTop ? '表' : '裏'}`;
+            const { offenseName, defenseName, situationTag } = ctx;
+
+            if (actionType === 'HOMERUN') {
+                const hrText = runsScored >= 2
+                    ? `${inningLabel}、${offenseName}の打球がスタンドへ一直線。${runsScored}ランで${situationTag}を一気に引き寄せます。`
+                    : `${inningLabel}、${offenseName}の一発が飛び出しました。${situationTag}で大きな先制・追加点となります。`;
+                return hrText;
+            }
+            if (actionType === 'HIT_3B') {
+                return `${inningLabel}、${offenseName}が右中間を破る三塁打。${runsScored > 0 ? `${runsScored}点を返し、` : ''}好機を広げます。`;
+            }
+            if (actionType === 'HIT_2B') {
+                return `${inningLabel}、${offenseName}が外野の頭を超える二塁打。${runsScored > 0 ? `${runsScored}点が生まれ、` : ''}得点圏に走者を進めます。`;
+            }
+            if (actionType === 'HIT_1B') {
+                return `${inningLabel}、${offenseName}がセンター前へ運びます。${runsScored > 0 ? `${runsScored}点を奪い、` : ''}${situationTag}で食らいつきます。`;
+            }
+            if (actionType === 'RUNNER_ADVANCE_ONLY') {
+                return `${inningLabel}、${offenseName}が走塁で揺さぶりをかけます。${runsScored > 0 ? `生還で${runsScored}点、` : ''}走者が次の塁を陥れました。`;
+            }
+            if (actionType === 'RUNNER_CAUGHT_OUT') {
+                return `${inningLabel}、${defenseName}バッテリーが冷静な連携で走者を刺しました。${situationTag}で流れを渡しません。`;
+            }
+            if (actionType === 'SACRIFICE_BUNT_ADVANCE') {
+                return `${inningLabel}、${offenseName}が送りバントを決めました。${runsScored > 0 ? `三塁走者が生還して${runsScored}点、` : ''}確実に走者を進めます。`;
+            }
+            if (actionType === 'BAD_FLAG_OFFENSE_WIN_OUT') {
+                return `${inningLabel}、${offenseName}が読み勝ったものの${defenseName}の守備網に阻まれます。${situationTag}、惜しいアウトとなりました。`;
+            }
+            if (actionType === 'BAD_FLAG_DEFENSE_WIN_HIT') {
+                return `${inningLabel}、${defenseName}が狙い澄ました一球も${offenseName}がしぶとく弾き返します。${runsScored > 0 ? `${runsScored}点を追加、` : ''}勝負は分かりません。`;
+            }
+            if (actionType === 'DOUBLE_PLAY_2OUT') {
+                return `${inningLabel}、${defenseName}が併殺で一気に2つのアウトを奪います。${situationTag}で主導権を握ります。`;
+            }
+            if (actionType === 'OUT_3') {
+                return `${inningLabel}、${defenseName}が三者凡退に打ち取りチェンジ。${situationTag}、落ち着いたマウンドさばきです。`;
+            }
+            return `${inningLabel}、${defenseName}が打球を処理してアウト。${situationTag}、一進一退の攻防が続きます。`;
+        }
+
         setLobbyStatus(msg) {
             const el = document.getElementById('lobby-status-msg');
             if (el) el.textContent = msg;
@@ -1206,7 +1345,7 @@
                 if (this.net.isConnected) {
                     this.clearJoinPoll();
                     this.updateNetworkSignalUI(true, 15);
-                    this.setLobbyStatus(`🔗 ゲスト合流成功！プレイボール！`);
+                    this.setLobbyStatus(`🔗 ゲスト合流成功。試合を開始します。`);
                     setTimeout(() => this.startPvpGame('ONLINE'), 800);
                     return;
                 }
@@ -1217,7 +1356,7 @@
                         if (parsed.senderRole === 'GUEST' && parsed.type === 'JOIN') {
                             this.clearJoinPoll();
                             this.updateNetworkSignalUI(true, 15);
-                            this.setLobbyStatus(`🔗 ゲスト合流成功！プレイボール！`);
+                            this.setLobbyStatus(`🔗 ゲスト合流成功。試合を開始します。`);
                             setTimeout(() => this.startPvpGame('ONLINE'), 800);
                         }
                     } catch(e) {}
@@ -1242,7 +1381,7 @@
                 this.net.init(id, 'GUEST', this.myTeam, (data) => this.handleNetworkData(data));
                 this.net.send({ type: 'JOIN', team: this.myTeam });
                 this.updateNetworkSignalUI(true, 22);
-                this.setLobbyStatus(`🔗 接続成功！ゲームへ入場します...`);
+                this.setLobbyStatus(`🔗 接続成功。ゲームへ入場します。`);
                 setTimeout(() => this.startPvpGame('ONLINE'), 900);
             }
         }
@@ -1291,7 +1430,7 @@
                 this.isTeamLocked = false;
                 this.currentPhase = 'START_MOVE';
                 this.justStartedPlayBall = false;
-                this.updateBoardAndCommentary("爽やかな青空のデーゲーム！間もなく試合開始です…");
+                this.updateBoardAndCommentary("青空のデーゲーム、間もなく試合開始です。両軍の布陣に注目です。");
             } else {
                 this.isTeamLocked = true;
                 this.currentPhase = 'ROUTINE_1_STATUS';
@@ -1300,7 +1439,7 @@
                     this.opponentFlagReady = true;
                 }
                 snd.playOpeningFanfare();
-                this.updateBoardAndCommentary("熱気渦巻くエキシビションナイター！プレイボール！");
+                this.updateBoardAndCommentary("ナイターのエキシビションマッチ、プレイボール。1回表の攻防が始まります。");
                 this.startTurnTimer();
             }
             this.renderAll();
@@ -1381,7 +1520,6 @@
             this.renderAll();
         }
 
-        // 通信タイマー0秒時の強制進行（フリーズ防止）
         handleTimeOutAutoAction() {
             if (this.gameMode !== 'PVP' || this.gameEnded) return;
 
@@ -1421,7 +1559,6 @@
                     }
                 }
 
-                // 相手未応答でも0秒到達時にフリーズさせず進行
                 if (!this.opponentReady) {
                     let aiTeam = (this.myTeam === 'REDS') ? 'BLACKS' : 'REDS';
                     let oppPool = this.handsData[aiTeam];
@@ -1460,7 +1597,7 @@
                         this.justStartedPlayBall = true;
                         this.currentPhase = 'ROUTINE_1_STATUS';
                         snd.playOpeningFanfare();
-                        this.updateBoardAndCommentary("一球一球にスタンドから大歓声が送られます！いよいよプレイボール！");
+                        this.updateBoardAndCommentary("スタンドの声援が高まる中、プレイボールがかかりました。1回表の攻撃に入ります。");
                         this.renderAll();
                         break;
                     case 'ROUTINE_1_STATUS':
@@ -1540,7 +1677,8 @@
             this.flagDeck.homeVal = flagValues[Math.floor(Math.random() * flagValues.length)];
             this.currentCase = this.evaluateCase(this.flagDeck.visitorVal, this.flagDeck.homeVal);
 
-            this.updateBoardAndCommentary("ぴーっ、ぴ〜、ピピーッ！ドーン・ドーン・ドン・ドン・ドン！勝負のフラグオープン！");
+            const ctx = this.getSituationContext(0);
+            this.updateBoardAndCommentary(`${this.inning}回${this.isTop ? '表' : '裏'}、${this.currentCase.caseNum}が開かれました。${ctx.situationTag}、バッテリーと打者の駆け引きです。`);
             if (this.gameMode === 'PVP') this.startTurnTimer();
             this.renderAll();
         }
@@ -1653,7 +1791,7 @@
                 if (this.pvpSubMode === 'SINGLE' || (this.playerReady && this.opponentReady)) {
                     this.checkBothReadyAndBattle();
                 } else {
-                    this.updateBoardAndCommentary("ベンチのサインが交錯する！互いの切札を秘めた心理戦、勝負の行方は…！");
+                    this.updateBoardAndCommentary("選択が完了しました。相手ベンチの決断を待っています。");
                     this.renderAll();
                 }
             } else {
@@ -1669,7 +1807,7 @@
                 if (this.pvpSubMode === 'SINGLE' || this.netRole === 'HOST') {
                     this.executePhase3_Battle();
                 } else {
-                    this.updateBoardAndCommentary("両チームのカードが出揃った！勝負の判定へ…！");
+                    this.updateBoardAndCommentary("両軍のカードが出揃いました。投球から打球の行方を見守ります。");
                     this.renderAll();
                 }
             }
@@ -1965,13 +2103,11 @@
                 return;
             }
 
-            // ランナーあり時の CASE⑤ / CASE⑥ は「投球 → ダッシュ音 → 歓声」
             if (hadRunner && (rawCase === 'CASE⑤' || rawCase === 'CASE⑥' || effCase === 'CASE⑤' || effCase === 'CASE⑥')) {
                 snd.seRunnerCase5Or6();
                 return;
             }
 
-            // ランナー無しの時に守備が抑えた時（アウト）は「投球 → ミットのバシッ！ → 歓声」
             const isDefenseSuppressed = !outInfo.isHit && (
                 act === 'OUT_1' ||
                 act === 'OUT_3' ||
@@ -1983,7 +2119,6 @@
                 return;
             }
 
-            // 基本は「投球音 → 打撃音 → 歓声」
             const power = (act === 'HIT_3B' || act === 'HIT_2B') ? 1.18 : 1.0;
             snd.seStandardPitchHitCheer(power);
         }
@@ -1996,7 +2131,7 @@
                 this.currentPhase = 'ROUTINE_3_FOUL';
                 snd.playTone(440, 0.1);
                 setTimeout(() => snd.seUmpireFoul(), 600);
-                this.updateBoardAndCommentary("同値ファール！同じ球種・読みがぶつかりスタンドへ！");
+                this.updateBoardAndCommentary(`${this.inning}回${this.isTop ? '表' : '裏'}、ファールボール。同じ狙いが重なり、仕切り直しとなります。`);
                 if (this.gameMode === 'PVP') this.startTurnTimer();
                 this.renderAll();
                 return;
@@ -2006,45 +2141,13 @@
             let offenseRole = this.getOffenseRole();
             const outInfo = this.lastBattleOutcome;
             const act = outInfo.actionType;
-            let commentaryText = "";
 
-            if (act === 'HOMERUN') {
-                commentaryText = "特大のホームラン！テッテレ〜♪ テッテレ〜♪ テッテレ〜〜ッ！";
-            } else if (act === 'HIT_3B') {
-                commentaryText = "フェンス直撃の三塁打！チャンスが一気に広がる！";
-            } else if (act === 'HIT_2B') {
-                commentaryText = "会心の二塁打！外野の頭を超える鋭い打球！";
-            } else if (act === 'HIT_1B') {
-                commentaryText = "センター前へ抜けるクリーンヒット！";
-            } else if (act === 'RUNNER_ADVANCE_ONLY') {
-                commentaryText = "ランナーイベント成功！ダッシュで進塁！";
-            } else if (act === 'RUNNER_CAUGHT_OUT') {
-                commentaryText = "バッテリーの好リード！ランナーの進塁を阻止してアウト！";
-            } else if (act === 'SACRIFICE_BUNT_ADVANCE') {
-                commentaryText = "犠打成功！打者は犠牲アウトだが、ランナーが前進・生還！";
-            } else if (act === 'BAD_FLAG_OFFENSE_WIN_OUT') {
-                commentaryText = !outInfo.hadRunnerBefore
-                    ? "バッドフラグ発動！ミットのバシッ！で抑えられた！"
-                    : "バッドフラグ発動！攻撃側がカード勝利も不運なアウト！";
-            } else if (act === 'BAD_FLAG_DEFENSE_WIN_HIT') {
-                commentaryText = "バッドフラグ発動！守備側がカード勝利も回避できず痛打・進塁！";
-            } else if (act === 'DOUBLE_PLAY_2OUT') {
-                commentaryText = "痛恨のダブルプレー！守備陣が2アウトを奪った！";
-            } else if (act === 'OUT_3') {
-                commentaryText = !outInfo.hadRunnerBefore
-                    ? "ミットのバシッ！完璧な投球で3アウトチェンジ！"
-                    : "完璧な守備で3アウトチェンジ！";
-            } else {
-                commentaryText = !outInfo.hadRunnerBefore
-                    ? "投球→ミットのバシッ！打ち取って1アウト！"
-                    : "打ち取った！1アウト！";
-            }
-
-            this.playBattleOutcomeSE(outInfo);
-            this.updateBoardAndCommentary(commentaryText);
             let oldScore = this.scores[offenseRole];
             this.applyCorrectCaseResult(act);
             let scoreAdded = Math.max(0, this.scores[offenseRole] - oldScore);
+
+            this.playBattleOutcomeSE(outInfo);
+            this.updateBoardAndCommentary(this.buildLiveCommentary(act, outInfo, scoreAdded));
 
             if (scoreAdded > 0) {
                 this.inningScores[offenseRole][this.inning - 1] = (this.inningScores[offenseRole][this.inning - 1] || 0) + scoreAdded;
@@ -2124,7 +2227,8 @@
             this.opponentReady = false;
             this.currentPhase = 'ROUTINE_2_SELECT';
             this.isFlagOpened = true;
-            this.updateBoardAndCommentary("カウントは変わらず！同じケースで仕切り直しの打ち直しだ！");
+            const ctx = this.getSituationContext(0);
+            this.updateBoardAndCommentary(`ファール後の打ち直し。${ctx.situationTag}、次の一球に注目です。`);
             if (this.gameMode === 'PVP') this.startTurnTimer();
             this.renderAll();
         }
@@ -2180,7 +2284,8 @@
             this.playerReady = false;
             this.opponentReady = false;
 
-            this.updateBoardAndCommentary("攻守の陣形が整います！次の打席へ！");
+            const ctx = this.getSituationContext(0);
+            this.updateBoardAndCommentary(`${this.inning}回${this.isTop ? '表' : '裏'}、${ctx.situationTag}。次の勝負へ移ります。`);
             if (this.gameMode === 'PVP') this.startTurnTimer();
             this.renderAll();
         }
@@ -2205,7 +2310,7 @@
 
             document.getElementById('news-score-table').innerHTML = tableHtml;
             let winName = winnerRole === 'DRAW' ? '引き分け' : (winnerRole === 'home' ? hName : vName);
-            let statsHtml = `<b>【試合速報】</b> 白熱のゲームセット！勝者：${winName}`;
+            let statsHtml = `<b>【試合速報】</b> 試合終了。勝者：${winName}`;
             document.getElementById('news-stats-content').innerHTML = statsHtml;
             document.getElementById('result-screen').style.display = 'flex';
         }
