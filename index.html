@@ -447,10 +447,8 @@
             this.init();
             if (!this.ctx) return;
 
-            // 1. 観客の歓声ベース
             this.playNoise(duration, vol, delaySec, 'bandpass', 980, 0.72);
 
-            // 2. 指笛「ぴゅ〜いっ！」
             try {
                 const whistleStart = this.ctx.currentTime + Math.max(0, delaySec + 0.08);
                 const wOsc = this.ctx.createOscillator();
@@ -471,7 +469,6 @@
                 wOsc.stop(whistleStart + 0.32);
             } catch(e) {}
 
-            // 3. ピロピロしたガヤ歓声（高い音域の軽やかな揺れ）
             const piroNotes = [
                 { f: 1850, d: 0.05, t: 0.16 },
                 { f: 2220, d: 0.05, t: 0.21 },
@@ -609,77 +606,72 @@
         }
 
         // フラグオープンSE：
-        // 太鼓「ドーン・ドーン・ドン・ドン・ドン！」に重ねて笛「ぴーっ、ぴーっ、ピッピッピッ！」、最後は太鼓だけで「ドン・ドン・ドン！」
+        // 高めのホイッスルで「か〜っと〜ばせ〜っ！（ぴーっ、ぴっぴぴ〜っ！）」→ 最後に太鼓だけで「ドン・ドン・ドン！」
         seFlagOpenCheer() {
             this.init();
             if (!this.ctx) return;
 
             const now = this.ctx.currentTime;
 
-            // メイン太鼓リズム：「ドーン・ドーン・ドン・ドン・ドン！」（0.00s〜0.92s）
-            const mainDrums = [
-                { start: 0.00, dur: 0.22, startFreq: 105, endFreq: 38, vol: 0.42 }, // ドーン
-                { start: 0.24, dur: 0.22, startFreq: 105, endFreq: 38, vol: 0.42 }, // ドーン
-                { start: 0.48, dur: 0.12, startFreq: 115, endFreq: 42, vol: 0.38 }, // ドン
-                { start: 0.62, dur: 0.12, startFreq: 115, endFreq: 42, vol: 0.38 }, // ドン
-                { start: 0.76, dur: 0.14, startFreq: 125, endFreq: 40, vol: 0.42 }  // ドン
+            // 高めのホイッスル「か〜っと〜ばせ〜っ！」（0.00s〜0.86s）
+            const whistleSegments = [
+                // 「か〜っ〜」（タメながらぐっと上げる）
+                { start: 0.00, dur: 0.34, fStart: 1950, fEnd: 2450, vol: 0.22 },
+                // 「と〜」（少し下がって受け）
+                { start: 0.36, dur: 0.14, fStart: 2250, fEnd: 2150, vol: 0.20 },
+                // 「ば」（ぴっ）
+                { start: 0.52, dur: 0.06, fStart: 2400, fEnd: 2450, vol: 0.21 },
+                // 「せ」（ぴっ）
+                { start: 0.59, dur: 0.06, fStart: 2550, fEnd: 2620, vol: 0.22 },
+                // 「〜っ！」（ぴ〜っ！と高音で伸ばして跳ね上げる）
+                { start: 0.66, dur: 0.20, fStart: 2720, fEnd: 3120, vol: 0.25 }
             ];
 
-            mainDrums.forEach(d => {
-                const t0 = now + d.start;
-                const osc = this.ctx.createOscillator();
-                const gain = this.ctx.createGain();
-                osc.type = 'triangle';
-                osc.frequency.setValueAtTime(d.startFreq, t0);
-                osc.frequency.exponentialRampToValueAtTime(d.endFreq, t0 + d.dur);
-                gain.gain.setValueAtTime(d.vol, t0);
-                gain.gain.exponentialRampToValueAtTime(0.001, t0 + d.dur + 0.02);
-                osc.connect(gain); gain.connect(this.ctx.destination);
-                osc.start(t0); osc.stop(t0 + d.dur + 0.03);
+            whistleSegments.forEach(w => {
+                try {
+                    const t0 = now + w.start;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(w.fStart, t0);
+                    osc.frequency.exponentialRampToValueAtTime(w.fEnd, t0 + w.dur);
+
+                    gain.gain.setValueAtTime(0.001, t0);
+                    gain.gain.linearRampToValueAtTime(w.vol, t0 + Math.min(0.025, w.dur * 0.25));
+                    gain.gain.setValueAtTime(w.vol * 0.9, t0 + w.dur * 0.7);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + w.dur);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(t0);
+                    osc.stop(t0 + w.dur + 0.02);
+                } catch(e) {}
             });
 
-            // 重ねる笛：「ぴーっ、ぴーっ、ピッピッピッ！」（0.03s〜0.86s）
-            const whistles = [
-                { freq: 1568, start: 0.03, dur: 0.17, slideTo: 1620 }, // ぴーっ
-                { freq: 1568, start: 0.27, dur: 0.17, slideTo: 1620 }, // ぴーっ
-                { freq: 1760, start: 0.50, dur: 0.07, slideTo: 1760 }, // ピッ
-                { freq: 1865, start: 0.63, dur: 0.07, slideTo: 1865 }, // ピッ
-                { freq: 1975, start: 0.77, dur: 0.08, slideTo: 2040 }  // ピッ
+            // ラスト締め：ホイッスル後、太鼓だけの「ドン・ドン・ドン！」（0.94s〜1.42s）
+            const finalDrums = [
+                { start: 0.94, dur: 0.14, startFreq: 120, endFreq: 40, vol: 0.44 }, // ドン
+                { start: 1.11, dur: 0.14, startFreq: 120, endFreq: 40, vol: 0.44 }, // ドン
+                { start: 1.28, dur: 0.22, startFreq: 140, endFreq: 34, vol: 0.50 }  // ドン！
             ];
 
-            whistles.forEach(w => {
-                const t0 = now + w.start;
-                const osc = this.ctx.createOscillator();
-                const gain = this.ctx.createGain();
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(w.freq, t0);
-                osc.frequency.linearRampToValueAtTime(w.slideTo, t0 + w.dur);
-                gain.gain.setValueAtTime(0.001, t0);
-                gain.gain.linearRampToValueAtTime(0.18, t0 + 0.015);
-                gain.gain.setValueAtTime(0.16, t0 + w.dur * 0.7);
-                gain.gain.exponentialRampToValueAtTime(0.001, t0 + w.dur);
-                osc.connect(gain); gain.connect(this.ctx.destination);
-                osc.start(t0); osc.stop(t0 + w.dur + 0.02);
-            });
+            finalDrums.forEach(d => {
+                try {
+                    const t0 = now + d.start;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(d.startFreq, t0);
+                    osc.frequency.exponentialRampToValueAtTime(d.endFreq, t0 + d.dur);
 
-            // ラスト締め：笛なしで太鼓だけの「ドン・ドン・ドン！」（0.98s〜1.44s）
-            const outroDrums = [
-                { start: 0.98, dur: 0.13, startFreq: 115, endFreq: 40, vol: 0.42 }, // ドン
-                { start: 1.14, dur: 0.13, startFreq: 115, endFreq: 40, vol: 0.42 }, // ドン
-                { start: 1.30, dur: 0.20, startFreq: 135, endFreq: 34, vol: 0.48 }  // ドン！
-            ];
+                    gain.gain.setValueAtTime(d.vol, t0);
+                    gain.gain.exponentialRampToValueAtTime(0.001, t0 + d.dur + 0.02);
 
-            outroDrums.forEach(d => {
-                const t0 = now + d.start;
-                const osc = this.ctx.createOscillator();
-                const gain = this.ctx.createGain();
-                osc.type = 'triangle';
-                osc.frequency.setValueAtTime(d.startFreq, t0);
-                osc.frequency.exponentialRampToValueAtTime(d.endFreq, t0 + d.dur);
-                gain.gain.setValueAtTime(d.vol, t0);
-                gain.gain.exponentialRampToValueAtTime(0.001, t0 + d.dur + 0.02);
-                osc.connect(gain); gain.connect(this.ctx.destination);
-                osc.start(t0); osc.stop(t0 + d.dur + 0.03);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(t0);
+                    osc.stop(t0 + d.dur + 0.03);
+                } catch(e) {}
             });
         }
 
@@ -767,8 +759,8 @@
 
     class NetworkManager {
         constructor() {
-            this.serverHost = 'four51k1-peer-server.onrender.com'; //
-            this.serverUrl = `https://${this.serverHost}`; //
+            this.serverHost = 'four51k1-peer-server.onrender.com';
+            this.serverUrl = `https://${this.serverHost}`;
             this.channel = null;
             this.peer = null;
             this.conn = null;
@@ -1131,9 +1123,7 @@
 
         getSituationContext(runsScored = 0) {
             const offenseRole = this.getOffenseRole();
-            const defenseRole = this.getDefenseRole();
             const offenseName = this.getTeamLabelByRole(offenseRole);
-            const defenseName = this.getTeamLabelByRole(defenseRole);
             const isBottomFinal = (this.inning >= 3 && !this.isTop);
             const diffBefore = Math.abs(this.scores.visitor - this.scores.home);
 
@@ -1154,19 +1144,22 @@
                     situationTag = `${offenseName}が${diffBefore}点リードで追加点を狙う場面`;
                 }
             }
-            return { offenseName, defenseName, situationTag, runsScored };
+            return { offenseName, situationTag, runsScored };
         }
 
         buildLiveCommentary(actionType, outInfo, runsScored = 0) {
             const ctx = this.getSituationContext(runsScored);
             const inningLabel = `${this.inning}回${this.isTop ? '表' : '裏'}`;
-            const { offenseName, defenseName, situationTag } = ctx;
+            const { offenseName, defenseName, situationTag } = {
+                offenseName: ctx.offenseName,
+                defenseName: this.getTeamLabelByRole(this.getDefenseRole()),
+                situationTag: ctx.situationTag
+            };
 
             if (actionType === 'HOMERUN') {
-                const hrText = runsScored >= 2
+                return runsScored >= 2
                     ? `${inningLabel}、${offenseName}の打球がスタンドへ一直線。${runsScored}ランで${situationTag}を一気に引き寄せます。`
                     : `${inningLabel}、${offenseName}の一発が飛び出しました。${situationTag}で大きな先制・追加点となります。`;
-                return hrText;
             }
             if (actionType === 'HIT_3B') {
                 return `${inningLabel}、${offenseName}が右中間を破る三塁打。${runsScored > 0 ? `${runsScored}点を返し、` : ''}好機を広げます。`;
@@ -1304,7 +1297,7 @@
             if (!sigBox) return;
             sigBox.style.display = 'block';
             if (isConnected) {
-                sigStatus.textContent = "Connected (four51k1)"; //
+                sigStatus.textContent = "Connected (four51k1)";
                 sigStatus.style.color = "#00FF00";
                 sigHandshake.innerHTML = `<span class="signal-dot active"></span>Synced & Ready`;
                 sigPing.textContent = `${latency} ms`;
@@ -1321,8 +1314,8 @@
             this.clearJoinPoll();
             this.net.close();
             document.getElementById('room-id-input').value = "";
-            this.setLobbyStatus("通信診断完了。four51k1-peer-server.onrender.com 接続をリセットしました。"); //
-            alert("【通信診断ツール】\n1. 接続先: four51k1-peer-server.onrender.com\n2. ルーム接続・再接続タイマー・同期キャッシュをリセットしました。"); //
+            this.setLobbyStatus("通信診断完了。four51k1-peer-server.onrender.com 接続をリセットしました。");
+            alert("【通信診断ツール】\n1. 接続先: four51k1-peer-server.onrender.com\n2. ルーム接続・再接続タイマー・同期キャッシュをリセットしました。");
         }
 
         async createRoom() {
